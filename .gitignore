@@ -32,3 +32,8 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Cowork planning docs — keep out of the public repo
+WEEK2_BUILD.md
+WEEK1_BUILD.md
+*_BUILD.md
