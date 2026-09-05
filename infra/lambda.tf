@@ -136,10 +136,12 @@ resource "aws_lambda_function" "lambda_function" {
 
 # Its a lambda + lambda url indeed
 
+# Gate 1 for lambda URL - Gives a door to lambda
 resource "aws_lambda_function_url" "lambda_function_url" {
   function_name      = aws_lambda_function.lambda_function.function_name
   authorization_type = "NONE" # no login needed
-
+# Gate 2 - CORS - the browser check - tells browser its ok for a webpage to call me
+# CORS is enforced by browser not Lambda
   cors {
     allow_origins = ["*"]
     allow_methods = ["POST"]
@@ -147,6 +149,8 @@ resource "aws_lambda_function_url" "lambda_function_url" {
   }
 }
 
+# Gate 3 - two invoke Permissions
+# allow invoke lambd through url
 resource "aws_lambda_permission" "public_url_access" {
   statement_id           = "AllowPublicFunctionUrlAccess"
   action                 = "lambda:InvokeFunctionUrl"
@@ -155,6 +159,7 @@ resource "aws_lambda_permission" "public_url_access" {
   function_url_auth_type = "NONE"
 }
 
+# allow run lambda
 resource "aws_lambda_permission" "public_invoke_function" {
   statement_id  = "AllowPublicInvokeFunction"
   action        = "lambda:InvokeFunction"

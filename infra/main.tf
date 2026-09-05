@@ -17,7 +17,7 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
-# Create S3 bucket
+# Create S3 bucket  - up to here just creating a bucket
 resource "aws_s3_bucket" "website" {
   bucket = "askanydoc-site-prod-apse2"
 
@@ -27,6 +27,8 @@ resource "aws_s3_bucket" "website" {
   }
 }
 
+# fliping the bucket into website mode and points index.html as suffix
+# Suffix = file to fall back when none is specified
 resource "aws_s3_bucket_website_configuration" "bucket_config" {
 
   # type = resource type - aws_s3_bucket   nickname = name we gave = bucket_config
@@ -48,7 +50,7 @@ resource "aws_s3_bucket_public_access_block" "website_public_access" {
   restrict_public_buckets = false
 }
 
-# Actual Permission- Anyone may read the files
+# Actual Permission- Bucket policy - set to Anyone may read the files
 resource "aws_s3_bucket_policy" "bucket_policy" {
   bucket = aws_s3_bucket.website.id
   policy = jsonencode({
@@ -65,9 +67,11 @@ resource "aws_s3_bucket_policy" "bucket_policy" {
   })
 }
 
+# upload index.html form the machine to the bucket.
+
 resource "aws_s3_object" "website_page_upload" {
   bucket       = aws_s3_bucket.website.id
-  key          = "index.html"
+  key          = "index.html"  # Name it will have in the bucket
   source       = "../site/index.html"
   content_type = "text/html"
 

@@ -60,20 +60,27 @@ client = instructor.from_bedrock(bedrock)
 # so by the time handler flushes, there's a finished trace ready to go.
 @observe()
 def process_question(question):
-    # client.chat.completions.create = Instructor's own way of calling Claude.
-    # response_model=Answer = the key line: force the reply into the Answer shape.
-    # modelId is required here - from_bedrock doesn't bake it in like from_provider did.
-    # system is its own separate field here (Bedrock's native shape), not inside messages.
-    result = client.chat.completions.create(
+    # create_with_completion = like create, but returns TWO things:
+    #   result     = the Answer object (answer + confidence), same as before
+    #   completion = the RAW reply, which carries token usage on it
+    # (plain create only returns result, so it can't give us tokens.)
+    result, completion = client.chat.completions.create_with_completion(
         modelId="au.anthropic.claude-haiku-4-5-20251001-v1:0",
         response_model=Answer,
-        system=[{"text": "You are a concise assistant. Answer in two sentences, and rate your confidence."}],
+        system=[{"text": (
+            "You are AskAnyDoc, a helpful assistant currently in development. "
+            "Answer questions clearly and concisely in two to three sentences, "
+            "and rate your confidence. Document-based answering is coming soon. "
+            "If asked what you are or what powers you, say you are the AskAnyDoc "
+            "assistant and keep the focus on helping with the user's question. "
+            "Do not discuss the underlying model, provider, or technical implementation."
+        )}],
         messages=[
             {"role": "user", "content": question},
         ],
     )
-    # result is ALREADY an Answer object - no manual digging into dicts needed.
-    return result
+    # return BOTH so handler can read the answer AND the token counts.
+    return result, completion
 
 
 # handler is NOT decorated. It calls the traced function, THEN flushes.
@@ -85,10 +92,17 @@ def handler(event, context):
     question = body["question"]
 
     # the span opens AND closes entirely inside this one call.
-    result = process_question(question)
+    # now we get back BOTH the answer object and the raw completion (for tokens).
+    result, completion = process_question(question)
+
+    # Bedrock returns completion as a DICT, and nests token counts under
+    # completion["usage"] with camelCase keys: inputTokens / outputTokens.
+    # (Different from OpenAI's completion.usage.prompt_tokens - Bedrock is its own shape.)
+    input_tokens = completion["usage"]["inputTokens"]     # tokens in the question/prompt
+    output_tokens = completion["usage"]["outputTokens"]   # tokens in the answer
 
     # print() still just goes to CloudWatch logs, not a screen.
-    print(f"Q: {question} | confidence: {result.confidence}")
+    print(f"Q: {question} | confidence: {result.confidence} | input_tokens: {input_tokens} | output_tokens: {output_tokens}")
 
     # get_client() grabs the connection @observe() already made behind the scenes.
     # .flush() forces it to send the trace NOW, before Lambda freezes and it's lost.
@@ -97,14 +111,17 @@ def handler(event, context):
     get_client().flush()
 
     # build the HTTP reply. body must be a JSON string, so we serialize the dict.
+    # NOTE: CORS header is NOT set here - the Function URL's cors{} block in lambda.tf
+    # adds it. Setting it in both places sends it twice ("*, *") and the browser blocks it.
     return {
         "statusCode": 200,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",   # lets a browser page call this later
         },
         "body": json.dumps({
             "answer": result.answer,
             "confidence": result.confidence,
+            "input_tokens": input_tokens,     # tokens used for the question
+            "output_tokens": output_tokens,   # tokens used for the answer
         }),
     }

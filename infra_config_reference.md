@@ -5,8 +5,9 @@
 **Project:** AskAnyDoc
 **Region:** ap-southeast-2 (Sydney)
 **State:** local (`terraform.tfstate` in `infra/`, git-ignored)
-**Provider:** hashicorp/aws `~> 5.92` · Terraform `>= 1.2`
-**Live URL:** http://askanydoc-site-prod-apse2.s3-website-ap-southeast-2.amazonaws.com
+**Providers:** hashicorp/aws `~> 5.92`, hashicorp/archive `~> 2.4` · Terraform `>= 1.2`
+**Website output:** http://askanydoc-site-prod-apse2.s3-website-ap-southeast-2.amazonaws.com
+**API output:** `api_url` is emitted by Terraform; the current value is kept in local state and the frontend configuration.
 **Tagging convention:** `project = "askanydoc"`, `managed-by = "terraform"`
 
 ---
@@ -15,15 +16,18 @@
 
 | File | Holds |
 |------|-------|
-| `infra/main.tf` | terraform block, provider, all resources |
-| `infra/outputs.tf` | output values (the live URL) |
+| `infra/main.tf` | Terraform/provider requirements and S3 static-site resources |
+| `infra/lambda.tf` | Lambda IAM, dependency packaging, function, Function URL, permissions, and `api_url` output |
+| `infra/outputs.tf` | `website_url` output |
+| `app/api/requirements.txt` | Python packages installed into the Lambda ZIP |
+| `app/api/handler.py` | Lambda entry point, Bedrock structured output, token capture, and Langfuse tracing |
 
 ---
 
 ## Resources (the inventory)
 
 ### 1. Provider setup
-- **terraform block** — `required_providers`: aws = `hashicorp/aws` `~> 5.92`; `required_version = ">= 1.2"`. Pins versions so nothing silently upgrades.
+- **terraform block** — `required_providers`: aws = `hashicorp/aws` `~> 5.92`, archive = `hashicorp/archive` `~> 2.4`; `required_version = ">= 1.2"`. Pins compatible provider versions.
 - **`provider "aws"`** — `region = "ap-southeast-2"`. Sets cloud + region for everything below.
 
 ### 2. `aws_s3_bucket` — nickname `website`
@@ -51,10 +55,61 @@
 - **Key settings:** `bucket = aws_s3_bucket.website.id`; `key = "index.html"` (name in bucket); `source = "../site/index.html"` (local file to read); `content_type = "text/html"` (so browsers render it).
 - **To update the live page:** edit `site/index.html` → `terraform apply` (Terraform detects the change and re-uploads).
 
-### 7. Output — `website_url`
+## Lambda API resources (`infra/lambda.tf`)
+
+### 7. `aws_iam_role` — nickname `lambda_exec`
+- **What it is:** the execution identity assumed by AWS Lambda.
+- **Trust policy:** allows the `lambda.amazonaws.com` service to call `sts:AssumeRole`.
+- **Tags:** `project=askanydoc`, `managed-by=terraform`.
+
+### 8. `aws_iam_role_policy_attachment` — nickname `lambda_logs`
+- **What it is:** attaches AWS-managed `AWSLambdaBasicExecutionRole` to `lambda_exec`.
+- **Purpose:** lets `print()` output and runtime logs reach CloudWatch Logs.
+
+### 9. `aws_iam_role_policy` — nickname `bedrock_invoke`
+- **What it is:** inline permission allowing the Lambda role to call `bedrock:InvokeModel`.
+- **Current scope:** `Resource = "*"`, intentionally broad for the first demo and still due for least-privilege hardening.
+
+### 10. `aws_iam_role_policy` — nickname `langfuse_secret_access`
+- **What it is:** inline permission allowing the Lambda role to call `secretsmanager:GetSecretValue` for the one AskAnyDoc Langfuse secret.
+- **Boundary:** the secret was created outside Terraform; only the read permission is managed here. Never store or document its values in the repository.
+
+### 11. `null_resource` — nickname `install_deps`
+- **What it is:** local packaging step that rebuilds `infra/build/`, installs `requirements.txt` as manylinux CPython 3.13 binaries, and copies `handler.py` into the build directory.
+- **Triggers:** hashes of `requirements.txt` and `handler.py`, so dependency packaging reruns when either changes.
+- **Repository note:** `infra/build/` is generated output and should not remain tracked long-term.
+
+### 12. `archive_file` data source — nickname `lambda_zip`
+- **What it is:** zips the complete `infra/build/` directory into `infra/lambda.zip` after dependency installation.
+- **Used by:** `aws_lambda_function.lambda_function` for `filename` and `source_code_hash`.
+
+### 13. `aws_lambda_function` — nickname `lambda_function`
+- **AWS name:** `askanydoc-api`.
+- **Runtime:** Python 3.13; handler `handler.handler`; timeout 30 seconds; memory 256 MB.
+- **Purpose:** receives a question, gets structured `{answer, confidence}` output from Bedrock, captures token usage, sends a Langfuse trace, and returns JSON.
+
+### 14. `aws_lambda_function_url` — nickname `lambda_function_url`
+- **What it is:** public HTTPS entry point for the Lambda.
+- **Current settings:** `authorization_type = "NONE"`; CORS allows any origin, `POST`, and `content-type`.
+- **Security note:** this is a temporary demo posture and exposes potential invocation cost.
+
+### 15. Lambda permissions — `public_url_access` and `public_invoke_function`
+- **Gate 1:** permits any principal to call `lambda:InvokeFunctionUrl` through the unauthenticated Function URL.
+- **Gate 2:** permits the matching `lambda:InvokeFunction` action required by the public URL flow.
+
+## Outputs
+
+### `website_url`
 - **In:** `outputs.tf`.
 - **Value:** `aws_s3_bucket_website_configuration.bucket_config.website_endpoint`.
-- **Purpose:** prints the live URL after apply (no need to dig in the console). View anytime with `terraform output`.
+
+### `api_url`
+- **In:** `lambda.tf`.
+- **Value:** `aws_lambda_function_url.lambda_function_url.function_url`.
+
+## External runtime dependency
+
+AWS Secrets Manager contains the manually created `askanydoc/langfuse` secret. On Lambda cold start, `handler.py` reads its public key, secret key, and host, then sets the environment variables expected by the Langfuse SDK. Terraform manages access to this secret but not the secret resource or its values.
 
 ---
 
@@ -62,15 +117,26 @@
 
 ```
 provider (aws, ap-southeast-2)
-   └─ aws_s3_bucket.website  (the bucket)
-        ├─ aws_s3_bucket_website_configuration.bucket_config   → makes it a website, gives .website_endpoint
-        ├─ aws_s3_bucket_public_access_block.website_public_access → unlocks public access
-        ├─ aws_s3_bucket_policy.bucket_policy                  → grants public read (needs ↑ unlocked first)
-        └─ aws_s3_object.website_page_upload                   → uploads index.html
-   outputs.tf → website_url  = bucket_config.website_endpoint
+   ├─ aws_s3_bucket.website
+   │    ├─ website configuration → website_url
+   │    ├─ public-access block + bucket policy
+   │    └─ website_page_upload → site/index.html
+   │
+   └─ aws_iam_role.lambda_exec
+        ├─ AWSLambdaBasicExecutionRole → CloudWatch logs
+        ├─ bedrock_invoke policy → Bedrock model calls
+        ├─ langfuse_secret_access policy → Secrets Manager
+        └─ aws_lambda_function.lambda_function
+             ↑ archive_file.lambda_zip
+             ↑ null_resource.install_deps (requirements + handler)
+             └─ Function URL + two public invoke permissions → api_url
+
+browser/React → api_url → Lambda → Bedrock
+                         ├─ JSON answer + confidence + token counts → browser
+                         └─ trace → Langfuse Cloud
 ```
 
-**Flow in one line:** make a bucket → turn it into a website → unlock public access → grant public read → upload the page → print the URL.
+**Flow in one line:** S3 serves the page → React posts a question to the Function URL → Lambda invokes Bedrock → structured JSON returns to React while observability data is flushed to Langfuse.
 
 ---
 
@@ -83,7 +149,8 @@ provider (aws, ap-southeast-2)
 - **Repo:** github.com/Giribishal/askanydoc (public)
 - **CI:** `.github/workflows/terraform-ci.yml` — runs `terraform fmt -check -recursive` + `terraform init -backend=false` + `terraform validate` on every push. Green ✓ = formatted & valid.
 - **Git-ignored (never pushed):** `terraform.tfstate`, `terraform.tfstate.backup`, `.terraform/`.
+- **Current hygiene issue:** `infra/build/` and `infra/lambda.zip` were previously committed, so ignoring them now does not remove them from Git tracking. Clean the index in a deliberate, reviewed change.
 
 ---
 
-*Last updated: end of the S3 static-site build. Update the Resources table whenever infra changes.*
+*Last reconciled: 2026-09-04 against `main.tf`, `lambda.tf`, `outputs.tf`, `handler.py`, and Terraform state serial 104.*

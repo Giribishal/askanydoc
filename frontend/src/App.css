@@ -1,0 +1,143 @@
+/* App.css — AskAnyDoc chatbot styling.
+   Friendly + colorful: green user bubbles, teal AI accents, warm neutral page.
+   Layout: fixed header, scrolling chat in the middle, input pinned at the bottom. */
+
+/* ---- design tokens (colors used across the page) ---- */
+:root {
+  --page-bg: #f7f6f3;        /* warm off-white page background */
+  --user-bubble: hwb(260 39% 59%);    /* deep slate-blue — trustworthy, premium, blends with teal */
+  --user-text: #ffffff;      /* white text on the green bubble */
+  --ai-bubble: #ffffff;      /* clean white card for AI answers */
+  --ai-border: #e6e4de;      /* subtle border around AI bubbles */
+  --ai-text: #2c2c34;        /* dark grey text, easy to read */
+  --accent: #17a2a2;         /* teal accent (confidence pill, focus) */
+  --heading: #2c2c34;        /* heading color */
+}
+
+/* ---- reset a couple of browser defaults so layout is predictable ---- */
+* {
+  box-sizing: border-box;    /* padding counts inside width, not added on top */
+  margin: 0;
+}
+
+body {
+  background: var(--page-bg);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---- the whole app: a centered column that fills the screen height ---- */
+.app {
+  max-width: 820px;          /* don't stretch too wide on big screens */
+  margin: 0 auto;            /* center horizontally */
+  height: 100vh;             /* full screen height */
+  display: flex;             /* stack children top-to-bottom... */
+  flex-direction: column;    /* ...in a column */
+  padding: 0 16px;
+}
+
+/* ---- the title ---- */
+h1 {
+  text-align: center;
+  color: var(--heading);
+  font-size: 1.8rem;
+  font-weight: 700;
+  padding: 18px 0;
+  letter-spacing: -0.5px;
+}
+
+/* ---- the chat area: grows to fill space, scrolls when full ---- */
+.chat {
+  flex: 1;                   /* take up all remaining height */
+  overflow-y: auto;          /* scroll inside this area when messages overflow */
+  display: flex;
+  flex-direction: column;    /* bubbles stack top-to-bottom */
+  gap: 12px;                 /* space between bubbles */
+  padding: 8px 4px;
+}
+
+/* ---- a bubble: the rounded box holding one message ---- */
+.bubble {
+  max-width: 78%;            /* bubbles don't span the full width */
+  padding: 12px 16px;
+  border-radius: 16px;
+  line-height: 1.5;
+  font-size: 0.98rem;
+  animation: rise 0.25s ease;  /* gentle appear animation */
+}
+
+.bubble p { margin: 0; }
+
+/* ---- user bubble: green, aligned to the RIGHT ---- */
+.bubble.user {
+  background: var(--user-bubble);
+  color: var(--user-text);
+  align-self: flex-end;      /* push to the right side */
+  border-bottom-right-radius: 4px;  /* little "tail" corner */
+}
+
+/* ---- ai bubble: white card, aligned to the LEFT ---- */
+.bubble.ai {
+  background: var(--ai-bubble);
+  color: var(--ai-text);
+  border: 1px solid var(--ai-border);
+  align-self: flex-start;    /* push to the left side */
+  border-bottom-left-radius: 4px;   /* little "tail" corner */
+}
+
+/* ---- the confidence pill under an AI answer ---- */
+.confidence {
+  display: inline-block;
+  margin-top: 8px;
+  margin-right: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;      /* fully rounded = pill shape */
+  background: rgba(23, 162, 162, 0.12);  /* faint teal fill */
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ---- the input row pinned at the bottom ---- */
+.input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px 0 20px;
+}
+
+textarea {
+  flex: 1;                   /* textarea takes most of the width */
+  resize: none;              /* stop the user dragging it bigger */
+  padding: 12px 14px;
+  border: 1px solid var(--ai-border);
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.98rem;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: var(--accent);   /* teal border when active */
+}
+
+button {
+  padding: 0 22px;
+  background: var(--user-bubble);   /* green, matches the user bubbles */
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover { background: #454a93; } 
+button:disabled {
+  background: #a7dbb0;       /* faded green when disabled (while loading) */
+  cursor: not-allowed;
+}
+
+/* ---- the gentle appear animation for bubbles ---- */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
