@@ -10,7 +10,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-.terraform.lock.hcl
 .terraformrc
 terraform.rc
 
@@ -37,3 +36,12 @@ Thumbs.db
 WEEK2_BUILD.md
 WEEK1_BUILD.md
 *_BUILD.md
+
+# Generated Lambda package
+infra/build/
+infra/lambda.zip
+
+# Week 3 local/generated files
+data/raw/
+tmp/
+*.tfplan
