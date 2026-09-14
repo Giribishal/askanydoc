@@ -40,6 +40,7 @@ WEEK1_BUILD.md
 # Generated Lambda package
 infra/build/
 infra/lambda.zip
+infra/ingestion_lambda.zip
 
 # Week 3 local/generated files
 data/raw/

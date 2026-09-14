@@ -13,6 +13,15 @@ function App() {
   const [messages, setMessages] = useState([])   // the WHOLE conversation (a list)
   const [loading, setLoading] = useState(false)  // true while we wait for the Lambda
 
+  function citationLabel(citation) {
+    const location = citation.location || {}
+    if (location.page_number) return `${citation.source_name}, page ${location.page_number}`
+    if (location.heading_path?.length) return `${citation.source_name}, ${location.heading_path.join(" > ")}`
+    if (location.heading) return `${citation.source_name}, ${location.heading}`
+    if (location.line_start) return `${citation.source_name}, lines ${location.line_start}-${location.line_end}`
+    return citation.source_name
+  }
+
   // bottomRef = a POINTER to an empty marker at the very bottom of the chat.
   // useRef lets us reach a real element on the page so we can act on it (here: scroll to it).
   const bottomRef = useRef(null)
@@ -35,28 +44,30 @@ function App() {
     // [...prev, newItem] = keep all old messages, add the new one at the end.
     setMessages(prev => [...prev, { role: "user", text: question }])
 
-    // fetch = send the same POST request the terminal test sent, but from the page.
-    // await = pause here until the reply comes back.
-    const response = await fetch("https://v7vhq6uuwh4jvrv3qash7faamy0ngslw.lambda-url.ap-southeast-2.on.aws/", {
-      method: "POST",                                    // we are SENDING data
-      headers: { "Content-Type": "application/json" },   // the data is JSON
-      body: JSON.stringify({ question: question }),      // serialize: data -> JSON string
-    })
+    try {
+      const response = await fetch("https://v7vhq6uuwh4jvrv3qash7faamy0ngslw.lambda-url.ap-southeast-2.on.aws/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: question }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "AskAnyDoc could not answer.")
 
-    // .json() unpacks the reply into a usable object (deserialize: text -> object).
-    const data = await response.json()   // data = { answer: "...", confidence: 0.95 }
-
-    // add the AI's answer to the list when it arrives.
-    setMessages(prev => [...prev, {
-      role: "ai",
-      text: data.answer,
-      confidence: data.confidence,
-      input_tokens: data.input_tokens,      // tokens used for the question
-      output_tokens: data.output_tokens,    // tokens used for the answer
-    }])
-
-    setQuestion("")     // clear the box for the next question (value={question} makes this work)
-    setLoading(false)   // done waiting
+      setMessages(prev => [...prev, {
+        role: "ai",
+        text: data.answer,
+        confidence: data.confidence,
+        grounded: data.grounded,
+        citations: data.citations || [],
+        input_tokens: data.input_tokens,
+        output_tokens: data.output_tokens,
+      }])
+      setQuestion("")
+    } catch (error) {
+      setMessages(prev => [...prev, { role: "ai", text: error.message, error: true }])
+    } finally {
+      setLoading(false)
+    }
   }
 
   // ── what the page looks like, based on the current data ──
@@ -77,6 +88,16 @@ function App() {
             {msg.confidence && <span className="confidence">Confidence: {msg.confidence}</span>}
             {msg.input_tokens && <span className="confidence">Input tokens: {msg.input_tokens}</span>}
             {msg.output_tokens && <span className="confidence">Output tokens: {msg.output_tokens}</span>}
+            {msg.citations?.length > 0 && (
+              <div className="citations">
+                <strong>Sources</strong>
+                <ul>
+                  {msg.citations.map((citation, citationIndex) => (
+                    <li key={`${citation.source_uri}-${citationIndex}`}>{citationLabel(citation)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         ))}
 

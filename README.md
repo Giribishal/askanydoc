@@ -2,7 +2,7 @@
 
 **Project 1 of 3 · Weeks 1–6 · Production-grade RAG knowledge assistant on AWS**
 
-## Status: 🔄 In progress — Week 3 (embeddings + pgvector retrieval foundation)
+## Status: 🔄 In progress — Week 4 (grounded retrieval + cited answers working)
 
 - Started: 2026-06-13
 - Shipped v1.0: (TBD)
@@ -21,6 +21,10 @@
 - A fresh browser → Lambda → Bedrock smoke test returned a structured answer with confidence `0.95`, using 802 input tokens and 82 output tokens.
 - That smoke call cost approximately **USD $0.00133** at the AU Haiku 4.5 rates recorded in `app/api/bedrock_smoke.py` (model inference only).
 - Sunday post #2 / AskAnyDoc v0.1 launch was confirmed from Bishal's LinkedIn screenshot on 2026-09-04; it had been published about three weeks earlier.
+- Multi-format ingestion now sends PDF, DOCX, TXT, and Markdown through extraction, chunking, Titan V2 embeddings, and Aurora PostgreSQL with pgvector.
+- The answer Lambda embeds each question with the same Titan configuration, retrieves relevant chunks, and gives Claude only numbered evidence.
+- Live verification returned a grounded answer with a real PDF page citation; an unrelated question returned `grounded: false` without invoking Claude.
+- The deployed React chat displays citations and handles API failures. Terraform now manages the complete built frontend rather than the Week 1 placeholder.
 
 ### Week 2 outcome
 
@@ -33,11 +37,20 @@
 
 Prompt-tutorial and assigned-reading status remain personal learning-log follow-ups; they do not block beginning Week 3. The uncommitted authored work and generated dependency churn still need a deliberate Git-hygiene pass.
 
+### Current verified RAG boundary
+
+- Direct S3/AWS SDK ingestion and custom pgvector retrieval are working end to end.
+- The public Function URL is retained for the portfolio slice, with exact-site CORS and input limits. Authentication and stronger rate limiting are deferred to an API Gateway/Cognito adapter.
+- Retrieval currently uses top-5 cosine similarity with a configurable `0.35` minimum. This threshold must be calibrated with the F5 evaluation set rather than treated as universally optimal.
+- Scanned-PDF OCR and additional file formats remain deferred.
+
 ---
 
 ## What this becomes
 
-A web application where users upload PDF documents (initial corpus: ~10 ACSC cybersecurity guidelines) and ask questions. The system retrieves relevant passages with citations and answers using Claude on AWS Bedrock. Polished UI, real evals, full production deployment.
+A web application where users upload supported text-bearing documents (`.pdf`, `.docx`, `.txt`, and `.md`) and ask questions. Format-specific extractors normalize text and provenance before the shared chunking, Titan embedding, and Aurora PostgreSQL/pgvector pipeline. The system retrieves relevant passages with citations and answers using Claude on AWS Bedrock.
+
+Excel/CSV, PowerPoint, images, scanned-document OCR, and other formats are explicitly deferred until after the core RAG learning plan.
 
 ## Plan section reference
 
@@ -51,7 +64,10 @@ askanydoc/
 ├── architecture.png (Excalidraw export, end of Week 6)
 ├── /app
 │   ├── api/                    (Lambda code)
-│   ├── ingestion/              (Lambda code)
+│   ├── ingestion/
+│   │   ├── runtime/            (deployed Lambda code and container recipe)
+│   │   ├── learning/           (local step-by-step RAG scripts)
+│   │   └── tests/              (ingestion tests)
 │   ├── shared/                 (chunking.py, embeddings.py, retrieval.py)
 │   └── requirements.txt
 ├── /frontend
@@ -73,6 +89,10 @@ askanydoc/
 └── /.github/workflows
     └── deploy.yml              (CI/CD with OIDC)
 ```
+
+Current ingestion navigation is documented in [`app/ingestion/README.md`](app/ingestion/README.md). Architecture references and the accompanying concept notes are kept together under [`docs/architecture/`](docs/architecture/).
+
+For the answer Lambda, `app/api/requirements.in` records the libraries chosen directly by the application, while `app/api/requirements.txt` locks the complete deployment package. Terraform generates `infra/build/` and `infra/lambda.zip`; neither belongs in Git.
 
 ## Exit criteria for shipping (end of Week 6)
 

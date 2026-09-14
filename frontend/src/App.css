@@ -97,6 +97,18 @@ h1 {
   font-weight: 600;
 }
 
+.citations {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ai-border);
+  font-size: 0.82rem;
+}
+
+.citations ul {
+  margin: 5px 0 0;
+  padding-left: 18px;
+}
+
 /* ---- the input row pinned at the bottom ---- */
 .input-row {
   display: flex;

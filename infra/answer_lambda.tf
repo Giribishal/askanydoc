@@ -1,7 +1,11 @@
-#It does four simple things, in order:
+# Answer Lambda infrastructure.
+# Packages the answer handler, grants its AWS permissions, creates the Lambda,
+# and exposes it through a Lambda Function URL.
+
+# It does four simple things, in order:
 
 # 1. Gives the code permission to exist and run in AWS (an identity + the right to call Bedrock)
-# 2. Zips up handler.py so AWS can upload it
+# 2. Zips up answer_lambda_handler.py so AWS can upload it
 # 3. Creates the actual live Lambda function from that zip
 # 4. Gives it a public web address (URL) so you can curl it
 
@@ -52,10 +56,15 @@ resource "aws_iam_role_policy" "bedrock_invoke" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = "bedrock:InvokeModel"
-      Resource = "*" # Resource specifies which specific thing 
-    }]               # so here * means the role may call all the bedrock models
+      Effect = "Allow"
+      Action = "bedrock:InvokeModel"
+      Resource = [
+        "arn:aws:bedrock:ap-southeast-2:404584456165:inference-profile/au.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:ap-southeast-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:ap-southeast-4::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:ap-southeast-2::foundation-model/amazon.titan-embed-text-v2:0"
+      ]
+    }]
   })
 }
 
@@ -77,30 +86,59 @@ resource "aws_iam_role_policy" "langfuse_secret_access" {
   })
 }
 
+# Let the answer Lambda read only the shared vector database through Data API.
+resource "aws_iam_role_policy" "answer_vector_database" {
+  name = "askanydoc-answer-vector-database"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "rds-data:ExecuteStatement"
+        Resource = aws_rds_cluster.vector_database.arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = "secretsmanager:GetSecretValue"
+        Resource = aws_rds_cluster.vector_database.master_user_secret[0].secret_arn
+      }
+    ]
+  })
+}
+
 # ── CHUNK 2: PACKAGE -> CREATE -> EXPOSE -> PRINT ──
 
 # Zip lambda handler - code that runs in lambda
 
-# Downloads instructor + pydantic into a build/ folder, and copies handler.py in too.
+# Downloads instructor + pydantic into a build/ folder, and copies answer_lambda_handler.py in too.
 # null_resource = "run this command" - not a real AWS thing, just a local action.
 resource "null_resource" "install_deps" {
-  # triggers = re-run this step whenever requirements.txt OR handler.py if these file change.
+  # triggers = re-run this step whenever requirements.txt or answer_lambda_handler.py changes.
   triggers = {
     requirements = filesha256("${path.module}/../app/api/requirements.txt")
-    handler_code = filesha256("${path.module}/../app/api/handler.py")
+    api_code = sha256(join("", [
+      for file in fileset("${path.module}/../app/api", "*.py") :
+      filesha256("${path.module}/../app/api/${file}")
+    ]))
+    shared_code = sha256(join("", [
+      for file in fileset("${path.module}/../app/shared/askanydoc_rag", "*.py") :
+      filesha256("${path.module}/../app/shared/askanydoc_rag/${file}")
+    ]))
   }
 
   # if (Test-Path ...\build) { Remove-Item -Recurse -Force ...\build } — if a build folder already exists, delete it and everything in it (fresh start).
   # pip install -r ...requirements.txt -t ...\build [flags] — install the deps from requirements.txt into the build folder (-t = target directory, which is what creates build).
-  # copy ...\handler.py ...\build\handler.py — copy your handler into that same folder.
+  # copy the answer handler into that same build folder.
 
   provisioner "local-exec" {
-    command     = "if (Test-Path ${path.module}\\build) { Remove-Item -Recurse -Force ${path.module}\\build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; copy ${path.module}\\..\\app\\api\\handler.py ${path.module}\\build\\handler.py"
+    command     = "if (Test-Path ${path.module}\\build) { Remove-Item -Recurse -Force ${path.module}\\build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\build; New-Item -ItemType Directory -Force ${path.module}\\build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\build\\askanydoc_rag"
     interpreter = ["PowerShell", "-Command"]
   }
 }
 
-# Now zip the WHOLE build folder (libraries + handler.py), not just handler.py alone.
+# Now zip the whole build folder containing libraries and answer_lambda_handler.py.
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_dir  = "${path.module}/build"
@@ -119,11 +157,24 @@ resource "aws_lambda_function" "lambda_function" {
   function_name    = "askanydoc-api"
   role             = aws_iam_role.lambda_exec.arn
   filename         = data.archive_file.lambda_zip.output_path
-  source_code_hash = data.archive_file.lambda_zip.output_base64sha256 # compare the handler.py and findout
-  handler          = "handler.handler"                                # if any changes in the handler code
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256 # redeploy when the ZIP content changes
+  handler          = "answer_lambda_handler.handler"                  # module.function inside the deployment ZIP
   runtime          = "python3.13"                                     # so that terraform knows if to do ZIP
-  timeout          = 30                                               # and upload the zip again
-  memory_size      = 256
+  timeout          = 60
+  memory_size      = 512
+
+  environment {
+    variables = {
+      ANSWER_MODEL_ID              = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
+      EMBEDDING_MODEL_ID           = "amazon.titan-embed-text-v2:0"
+      LANGFUSE_SECRET_ID           = "askanydoc/langfuse"
+      MINIMUM_RETRIEVAL_SIMILARITY = "0.35"
+      RETRIEVAL_RESULT_LIMIT       = "5"
+      VECTOR_DATABASE_ARN          = aws_rds_cluster.vector_database.arn
+      VECTOR_DATABASE_NAME         = aws_rds_cluster.vector_database.database_name
+      VECTOR_DATABASE_SECRET_ARN   = aws_rds_cluster.vector_database.master_user_secret[0].secret_arn
+    }
+  }
 
   tags = {
     project    = "askanydoc"
@@ -140,10 +191,10 @@ resource "aws_lambda_function" "lambda_function" {
 resource "aws_lambda_function_url" "lambda_function_url" {
   function_name      = aws_lambda_function.lambda_function.function_name
   authorization_type = "NONE" # no login needed
-# Gate 2 - CORS - the browser check - tells browser its ok for a webpage to call me
-# CORS is enforced by browser not Lambda
+  # Gate 2 - CORS - the browser check - tells browser its ok for a webpage to call me
+  # CORS is enforced by browser not Lambda
   cors {
-    allow_origins = ["*"]
+    allow_origins = ["http://askanydoc-site-prod-apse2.s3-website-ap-southeast-2.amazonaws.com"]
     allow_methods = ["POST"]
     allow_headers = ["content-type"]
   }
@@ -168,9 +219,4 @@ resource "aws_lambda_permission" "public_invoke_function" {
 }
 
 
-# STEP 4 — print the URL so you don't dig in the console.
-
-output "api_url" {
-  value = aws_lambda_function_url.lambda_function_url.function_url
-}
 

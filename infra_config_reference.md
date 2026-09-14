@@ -16,11 +16,20 @@
 
 | File | Holds |
 |------|-------|
-| `infra/main.tf` | Terraform/provider requirements and S3 static-site resources |
-| `infra/lambda.tf` | Lambda IAM, dependency packaging, function, Function URL, permissions, and `api_url` output |
-| `infra/outputs.tf` | `website_url` output |
-| `app/api/requirements.txt` | Python packages installed into the Lambda ZIP |
-| `app/api/handler.py` | Lambda entry point, Bedrock structured output, token capture, and Langfuse tracing |
+| `infra/main.tf` | Terraform/provider requirements and shared AWS account lookup |
+| `infra/s3_buckets.tf` | Terraform-managed React website assets and private document-ingestion bucket |
+| `infra/answer_lambda.tf` | Grounded answer Lambda, retrieval IAM, packaging, Bedrock access, Function URL, and permissions |
+| `infra/ingestion_lambda.tf` | Image-based ingestion Lambda, IAM, S3 read access, and upload event connection |
+| `infra/container_registry.tf` | Private ECR repository that stores ingestion Lambda container images |
+| `infra/outputs.tf` | Website URL, answer API URL, document bucket name, ingestion Lambda name, and ECR URL |
+| `app/api/requirements.in` | Direct answer-Lambda libraries intentionally selected by the application |
+| `app/api/requirements.txt` | Complete pinned package set installed into the answer-Lambda ZIP |
+| `app/api/answer_lambda_handler.py` | Grounded answer coordination, verified citations, validation, token capture, and privacy-safe logging |
+| `app/api/retrieval.py` | Titan question embedding and Aurora pgvector cosine retrieval |
+| `app/shared/askanydoc_rag/` | Reusable AWS clients, embeddings, Aurora-resume retry, and vector serialization |
+| `app/ingestion/runtime/` | Production ingestion Lambda handler, extractors, dependency list, and Dockerfile |
+| `app/ingestion/learning/` | Local learning scripts that expose extraction, chunking, embedding, and retrieval stages |
+| `app/ingestion/tests/` | Local automated tests for ingestion behavior |
 
 ---
 
@@ -55,7 +64,7 @@
 - **Key settings:** `bucket = aws_s3_bucket.website.id`; `key = "index.html"` (name in bucket); `source = "../site/index.html"` (local file to read); `content_type = "text/html"` (so browsers render it).
 - **To update the live page:** edit `site/index.html` → `terraform apply` (Terraform detects the change and re-uploads).
 
-## Lambda API resources (`infra/lambda.tf`)
+## Answer Lambda resources (`infra/answer_lambda.tf`)
 
 ### 7. `aws_iam_role` — nickname `lambda_exec`
 - **What it is:** the execution identity assumed by AWS Lambda.
@@ -68,15 +77,16 @@
 
 ### 9. `aws_iam_role_policy` — nickname `bedrock_invoke`
 - **What it is:** inline permission allowing the Lambda role to call `bedrock:InvokeModel`.
-- **Current scope:** `Resource = "*"`, intentionally broad for the first demo and still due for least-privilege hardening.
+- **Current scope:** Titan Text Embeddings V2 plus the active AU Claude Haiku 4.5 inference profile and its verified Sydney/Melbourne model destinations.
 
 ### 10. `aws_iam_role_policy` — nickname `langfuse_secret_access`
 - **What it is:** inline permission allowing the Lambda role to call `secretsmanager:GetSecretValue` for the one AskAnyDoc Langfuse secret.
 - **Boundary:** the secret was created outside Terraform; only the read permission is managed here. Never store or document its values in the repository.
 
 ### 11. `null_resource` — nickname `install_deps`
-- **What it is:** local packaging step that rebuilds `infra/build/`, installs `requirements.txt` as manylinux CPython 3.13 binaries, and copies `handler.py` into the build directory.
-- **Triggers:** hashes of `requirements.txt` and `handler.py`, so dependency packaging reruns when either changes.
+- **What it is:** local packaging step that rebuilds `infra/build/`, installs `requirements.txt` as manylinux CPython 3.13 binaries, and copies `answer_lambda_handler.py` into the build directory.
+- **Triggers:** hashes of `requirements.txt` and `answer_lambda_handler.py`, so dependency packaging reruns when either changes.
+- **Operational rule:** `infra/build/` and `infra/lambda.zip` are generated and ignored. If they are manually removed while the Terraform trigger is unchanged, rebuild this local packaging resource before running a full plan.
 - **Repository note:** `infra/build/` is generated output and should not remain tracked long-term.
 
 ### 12. `archive_file` data source — nickname `lambda_zip`
@@ -85,12 +95,13 @@
 
 ### 13. `aws_lambda_function` — nickname `lambda_function`
 - **AWS name:** `askanydoc-api`.
-- **Runtime:** Python 3.13; handler `handler.handler`; timeout 30 seconds; memory 256 MB.
-- **Purpose:** receives a question, gets structured `{answer, confidence}` output from Bedrock, captures token usage, sends a Langfuse trace, and returns JSON.
+- **Runtime:** Python 3.13; handler `answer_lambda_handler.handler`; timeout 30 seconds; memory 256 MB.
+- **Purpose:** validates a question, creates its Titan embedding, retrieves citation-ready pgvector evidence, asks Claude for a structured grounded answer, and returns answer/confidence/grounded/citations/token counts.
+- **Failure boundary:** irrelevant questions return a fixed no-evidence response without a Claude call. Logs contain a question hash rather than the full question.
 
 ### 14. `aws_lambda_function_url` — nickname `lambda_function_url`
 - **What it is:** public HTTPS entry point for the Lambda.
-- **Current settings:** `authorization_type = "NONE"`; CORS allows any origin, `POST`, and `content-type`.
+- **Current settings:** `authorization_type = "NONE"`; CORS allows only the live AskAnyDoc S3 website origin, `POST`, and `content-type`.
 - **Security note:** this is a temporary demo posture and exposes potential invocation cost.
 
 ### 15. Lambda permissions — `public_url_access` and `public_invoke_function`
@@ -104,12 +115,12 @@
 - **Value:** `aws_s3_bucket_website_configuration.bucket_config.website_endpoint`.
 
 ### `api_url`
-- **In:** `lambda.tf`.
+- **In:** `outputs.tf`.
 - **Value:** `aws_lambda_function_url.lambda_function_url.function_url`.
 
 ## External runtime dependency
 
-AWS Secrets Manager contains the manually created `askanydoc/langfuse` secret. On Lambda cold start, `handler.py` reads its public key, secret key, and host, then sets the environment variables expected by the Langfuse SDK. Terraform manages access to this secret but not the secret resource or its values.
+AWS Secrets Manager contains the manually created `askanydoc/langfuse` secret. On Lambda cold start, `answer_lambda_handler.py` reads its public key, secret key, and host, then sets the environment variables expected by the Langfuse SDK. Terraform manages access to this secret but not the secret resource or its values.
 
 ---
 
@@ -153,4 +164,4 @@ browser/React → api_url → Lambda → Bedrock
 
 ---
 
-*Last reconciled: 2026-09-04 against `main.tf`, `lambda.tf`, `outputs.tf`, `handler.py`, and Terraform state serial 104.*
+*Filename map reconciled: 2026-09-13 against `main.tf`, `s3_buckets.tf`, `answer_lambda.tf`, `ingestion_lambda.tf`, `container_registry.tf`, `outputs.tf`, `answer_lambda_handler.py`, and `ingestion_lambda_handler.py`.*

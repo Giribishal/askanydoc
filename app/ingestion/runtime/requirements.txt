@@ -1,0 +1,6 @@
+# AWS SDK used by the ingestion Lambda to download uploaded objects from S3.
+boto3==1.43.93
+
+# PDF and DOCX extraction dependencies used by the multi-format ingestion Lambda.
+pypdf==6.17.0
+python-docx==1.2.0
