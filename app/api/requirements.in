@@ -1,6 +1,4 @@
-# Direct libraries intentionally used by answer_lambda_handler.py.
+# Direct libraries intentionally used by the answer Lambda runtime.
 # requirements.txt records the complete resolved deployment environment.
-instructor==1.17.0
-pydantic==2.13.5
+boto3==1.43.93
 langfuse==4.15.2
-

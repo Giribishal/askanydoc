@@ -1,8 +1,8 @@
 # AskAnyDoc
 
-**Project 1 of 3 · Weeks 1–6 · Production-grade RAG knowledge assistant on AWS**
+**Project 1 of 3 · Weeks 1–6 · Hybrid AI and RAG assistant on AWS**
 
-## Status: 🔄 In progress — Week 4 (grounded retrieval + cited answers working)
+## Status: 🔄 In progress — hybrid assistant core working; evaluation remains
 
 - Started: 2026-06-13
 - Shipped v1.0: (TBD)
@@ -25,6 +25,9 @@
 - The answer Lambda embeds each question with the same Titan configuration, retrieves relevant chunks, and gives Claude only numbered evidence.
 - Live verification returned a grounded answer with a real PDF page citation; an unrelated question returned `grounded: false` without invoking Claude.
 - The deployed React chat displays citations and handles API failures. Terraform now manages the complete built frontend rather than the Week 1 placeholder.
+- Claude now acts as the conversational assistant and can request the custom organisation-source search as a controlled Bedrock Converse tool.
+- The browser sends bounded recent history for follow-ups. Responses distinguish conversation, general knowledge, organisation evidence, and missing organisation information.
+- Organisation citations are built from stored provenance only after the application validates Claude's selected evidence numbers.
 
 ### Week 2 outcome
 
@@ -37,12 +40,16 @@
 
 Prompt-tutorial and assigned-reading status remain personal learning-log follow-ups; they do not block beginning Week 3. The uncommitted authored work and generated dependency churn still need a deliberate Git-hygiene pass.
 
-### Current verified RAG boundary
+### Current verified hybrid boundary
 
 - Direct S3/AWS SDK ingestion and custom pgvector retrieval are working end to end.
 - The public Function URL is retained for the portfolio slice, with exact-site CORS and input limits. Authentication and stronger rate limiting are deferred to an API Gateway/Cognito adapter.
 - Retrieval currently uses top-5 cosine similarity with a configurable `0.35` minimum. This threshold must be calibrated with the F5 evaluation set rather than treated as universally optimal.
+- Claude Haiku 4.5 is configuration-selected through the AU inference profile. Model quality, latency, lifecycle, and cost must be evaluated before a company rollout.
+- Recent history is client-supplied and browser-local. Authentication, server-owned sessions, tenant isolation, and source ACL filtering remain mandatory company-deployment gates.
 - Scanned-PDF OCR and additional file formats remain deferred.
+
+The detailed current boundary and staged company-readiness gates are documented in [`docs/hybrid_assistant_architecture.md`](docs/hybrid_assistant_architecture.md).
 
 ---
 

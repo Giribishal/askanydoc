@@ -67,6 +67,28 @@ h1 {
 
 .bubble p { margin: 0; }
 
+.message-text {
+  white-space: pre-wrap;          /* preserve Claude's readable line breaks */
+}
+
+/* Claude answers use safe Markdown, so lists and separate paragraphs stay readable. */
+.bubble.ai .message-text {
+  white-space: normal;
+}
+
+.bubble.ai .message-text > * + * {
+  margin-top: 0.7rem;
+}
+
+.bubble.ai .message-text ul,
+.bubble.ai .message-text ol {
+  padding-left: 1.4rem;
+}
+
+.bubble.ai .message-text li + li {
+  margin-top: 0.25rem;
+}
+
 /* ---- user bubble: green, aligned to the RIGHT ---- */
 .bubble.user {
   background: var(--user-bubble);

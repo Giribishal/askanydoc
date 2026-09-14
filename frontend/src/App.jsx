@@ -4,6 +4,7 @@
 // React shows the whole conversation as bubbles, and auto-scrolls to the newest.
 
 import { useState, useRef, useEffect } from 'react'   // state + a page pointer + an after-update hook
+import ReactMarkdown from 'react-markdown'             // safely turn Claude's Markdown into readable HTML
 import './App.css'                                     // the styling for this page
 
 function App() {
@@ -38,6 +39,23 @@ function App() {
   async function askQuestion() {
     if (!question) return   // do nothing if the box is empty
 
+    const submittedQuestion = question
+    const history = messages
+      .filter((message, index, conversation) => (
+        !message.error && !(message.role === "user" && conversation[index + 1]?.error)
+      ))
+      .slice(-12)
+      .map(message => {
+        const role = message.role === "ai" ? "assistant" : "user"
+        return {
+          role: role,
+          content: message.text,
+          ...(role === "assistant" && message.source_mode
+            ? { source_mode: message.source_mode }
+            : {}),
+        }
+      })
+
     setLoading(true)   // we are now waiting
 
     // add the user's question to the list RIGHT AWAY (so it shows while AI thinks).
@@ -48,7 +66,10 @@ function App() {
       const response = await fetch("https://v7vhq6uuwh4jvrv3qash7faamy0ngslw.lambda-url.ap-southeast-2.on.aws/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: question }),
+        body: JSON.stringify({
+          question: submittedQuestion,
+          history: history,
+        }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "AskAnyDoc could not answer.")
@@ -56,8 +77,8 @@ function App() {
       setMessages(prev => [...prev, {
         role: "ai",
         text: data.answer,
-        confidence: data.confidence,
-        grounded: data.grounded,
+        source_mode: data.source_mode,
+        retrieval_score: data.retrieval_score,
         citations: data.citations || [],
         input_tokens: data.input_tokens,
         output_tokens: data.output_tokens,
@@ -83,11 +104,31 @@ function App() {
           // key = a unique label React needs for each item in a mapped list.
           // className picks the style by role: user bubble vs ai bubble (ternary if/else).
           <div key={index} className={msg.role === "user" ? "bubble user" : "bubble ai"}>
-            <p>{msg.text}</p>
-            {/* show confidence ONLY for ai messages (user messages have none) */}
-            {msg.confidence && <span className="confidence">Confidence: {msg.confidence}</span>}
-            {msg.input_tokens && <span className="confidence">Input tokens: {msg.input_tokens}</span>}
-            {msg.output_tokens && <span className="confidence">Output tokens: {msg.output_tokens}</span>}
+            {msg.role === "ai" ? (
+              // skipHtml keeps model-written HTML as plain text instead of executing it.
+              <div className="message-text"><ReactMarkdown skipHtml>{msg.text}</ReactMarkdown></div>
+            ) : (
+              <p className="message-text">{msg.text}</p>
+            )}
+            {msg.source_mode === "organisation_sources" && (
+              <span className="confidence">Organisation sources</span>
+            )}
+            {msg.source_mode === "general_knowledge" && (
+              <span className="confidence">General knowledge</span>
+            )}
+            {msg.source_mode === "organisation_not_found" && (
+              <span className="confidence">Organisation sources: no match</span>
+            )}
+            {/* Retrieval relevance comes from vector search, not model self-confidence. */}
+            {msg.source_mode === "organisation_sources" && (
+              <span className="confidence">Top source match: {msg.retrieval_score}</span>
+            )}
+            {msg.input_tokens > 0 && (
+              <span className="confidence">Input tokens: {msg.input_tokens}</span>
+            )}
+            {msg.output_tokens > 0 && (
+              <span className="confidence">Output tokens: {msg.output_tokens}</span>
+            )}
             {msg.citations?.length > 0 && (
               <div className="citations">
                 <strong>Sources</strong>

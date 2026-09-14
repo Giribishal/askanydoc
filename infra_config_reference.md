@@ -24,7 +24,9 @@
 | `infra/outputs.tf` | Website URL, answer API URL, document bucket name, ingestion Lambda name, and ECR URL |
 | `app/api/requirements.in` | Direct answer-Lambda libraries intentionally selected by the application |
 | `app/api/requirements.txt` | Complete pinned package set installed into the answer-Lambda ZIP |
-| `app/api/answer_lambda_handler.py` | Grounded answer coordination, verified citations, validation, token capture, and privacy-safe logging |
+| `app/api/answer_lambda_handler.py` | HTTP/history validation, tracing boundary, token capture, and privacy-safe logging |
+| `app/api/assistant_orchestrator.py` | Claude Converse loop, structured source modes, tool execution, and citation enforcement |
+| `app/api/organisation_tools.py` | Controlled organisation tool catalogue and provenance-based citation construction |
 | `app/api/retrieval.py` | Titan question embedding and Aurora pgvector cosine retrieval |
 | `app/shared/askanydoc_rag/` | Reusable AWS clients, embeddings, Aurora-resume retry, and vector serialization |
 | `app/ingestion/runtime/` | Production ingestion Lambda handler, extractors, dependency list, and Dockerfile |
@@ -59,10 +61,10 @@
 - **Key settings:** `bucket = aws_s3_bucket.website.id`; `policy = jsonencode({...})` granting `s3:GetObject` to `Principal "*"` (everyone) on `Resource = "${aws_s3_bucket.website.arn}/*"` (all objects in the bucket).
 - **Depends on:** #4 (guardrail must be down first). Applied fine without explicit `depends_on` because #4 already existed at apply time.
 
-### 6. `aws_s3_object` — nickname `website_page_upload`
-- **What it is:** uploads the local `index.html` into the bucket.
-- **Key settings:** `bucket = aws_s3_bucket.website.id`; `key = "index.html"` (name in bucket); `source = "../site/index.html"` (local file to read); `content_type = "text/html"` (so browsers render it).
-- **To update the live page:** edit `site/index.html` → `terraform apply` (Terraform detects the change and re-uploads).
+### 6. `aws_s3_object` — nickname `frontend_files`
+- **What it is:** uploads every production file under `frontend/dist/` into the website bucket.
+- **Key settings:** `for_each` follows the built file set; content types and cache controls differ for HTML, JavaScript, CSS, SVG, and other assets; `etag` detects content changes.
+- **To update the live page:** edit `frontend/src/` → run the frontend production build → review and apply Terraform.
 
 ## Answer Lambda resources (`infra/answer_lambda.tf`)
 
@@ -95,9 +97,9 @@
 
 ### 13. `aws_lambda_function` — nickname `lambda_function`
 - **AWS name:** `askanydoc-api`.
-- **Runtime:** Python 3.13; handler `answer_lambda_handler.handler`; timeout 30 seconds; memory 256 MB.
-- **Purpose:** validates a question, creates its Titan embedding, retrieves citation-ready pgvector evidence, asks Claude for a structured grounded answer, and returns answer/confidence/grounded/citations/token counts.
-- **Failure boundary:** irrelevant questions return a fixed no-evidence response without a Claude call. Logs contain a question hash rather than the full question.
+- **Runtime:** Python 3.13; handler `answer_lambda_handler.handler`; timeout 60 seconds; memory 512 MB.
+- **Purpose:** validates one message plus bounded recent history, lets Claude answer normally or request controlled organisation retrieval, and returns a structured source mode with validated citations and token counts.
+- **Current limits:** 12 history messages, 12,000 history characters, 2 organisation-tool rounds, and 2,048 response tokens. Logs contain a question hash rather than message content.
 
 ### 14. `aws_lambda_function_url` — nickname `lambda_function_url`
 - **What it is:** public HTTPS entry point for the Lambda.
@@ -131,7 +133,7 @@ provider (aws, ap-southeast-2)
    ├─ aws_s3_bucket.website
    │    ├─ website configuration → website_url
    │    ├─ public-access block + bucket policy
-   │    └─ website_page_upload → site/index.html
+   │    └─ frontend_files → frontend/dist/**
    │
    └─ aws_iam_role.lambda_exec
         ├─ AWSLambdaBasicExecutionRole → CloudWatch logs
@@ -142,9 +144,10 @@ provider (aws, ap-southeast-2)
              ↑ null_resource.install_deps (requirements + handler)
              └─ Function URL + two public invoke permissions → api_url
 
-browser/React → api_url → Lambda → Bedrock
-                         ├─ JSON answer + confidence + token counts → browser
-                         └─ trace → Langfuse Cloud
+browser/React → api_url → Lambda → Claude Converse
+                         ├─ optional organisation tool → Titan + Aurora/pgvector
+                         ├─ source-attributed JSON answer → browser
+                         └─ privacy-conscious trace → Langfuse Cloud
 ```
 
 **Flow in one line:** S3 serves the page → React posts a question to the Function URL → Lambda invokes Bedrock → structured JSON returns to React while observability data is flushed to Langfuse.

@@ -46,22 +46,22 @@ INGESTION - runs after a supported document is uploaded
 ```
 
 ```text
-QUESTION ANSWERING - runs for each question
+HYBRID ASSISTANT - runs for each message
 
-User -> React -> Answer Lambda
-                    |
-                    +-> Titan embeds the question
-                    |
-                    +-> pgvector finds nearest stored vectors
-                    |
-                    +<- Aurora returns chunk text + provenance
-                    |
-                    +-> Claude receives question + evidence
-                    |
-User <- React <------+-- answer + citations
+User + recent history -> React -> Answer Lambda -> Claude
+                                                /      \
+                              normal response <-        -> requests organisation search
+                                                               |
+                                                    Titan question embedding
+                                                               |
+                                                    pgvector evidence search
+                                                               |
+                                                    Claude final response
+                                                               |
+User <- React <- source mode + answer + validated citations <-+
 ```
 
-Lambda coordinates. Titan creates vectors. Aurora stores records. pgvector performs similarity search. Claude writes an answer from the retrieved evidence.
+Lambda coordinates. Claude decides whether the organisation-search tool is needed. Titan creates vectors. Aurora stores records. pgvector performs similarity search. Claude writes the response, while application code validates evidence numbers and builds citations from stored provenance.
 
 ## One ingestion Lambda with four extractor adapters
 
@@ -224,8 +224,8 @@ This ordering preserves the existing learning plan: prove one boundary, inspect 
 | Titan Embeddings | Converts chunk or question text to vectors | Answer questions |
 | Aurora PostgreSQL | Stores text, vectors, and metadata | Generate prose |
 | pgvector | Performs nearest-neighbour search | Choose or invoke extractors |
-| Answer Lambda | Coordinates embedding, retrieval, evidence, and answer generation | Perform vector comparison itself |
-| Claude | Writes a grounded answer from supplied evidence | Search S3 or Aurora directly |
+| Answer Lambda | Validates requests, runs Claude's approved tool calls, and enforces citation/source contracts | Grant Claude AWS credentials |
+| Claude | Converses normally and decides when organisation tools are needed | Search S3 or Aurora directly |
 
 ## Local-to-AWS mapping
 
@@ -269,9 +269,10 @@ UPLOAD
 PDF / DOCX / TXT / MD -> S3 -> Ingestion Lambda -> matching extractor
 -> normalized text + provenance -> chunks -> Titan -> Aurora/pgvector
 
-QUESTION
-Question -> Answer Lambda -> Titan -> pgvector search
--> chunk text + provenance -> Claude -> answer + citations
+ASSISTANT
+Message + recent history -> Answer Lambda -> Claude
+-> optional organisation tool -> Titan -> pgvector -> evidence
+-> Claude response -> application-validated citations
 ```
 
 The durable rule is simple: file format changes extraction; everything after normalized text and provenance is shared.

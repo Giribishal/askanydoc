@@ -5,7 +5,7 @@
 # It does four simple things, in order:
 
 # 1. Gives the code permission to exist and run in AWS (an identity + the right to call Bedrock)
-# 2. Zips up answer_lambda_handler.py so AWS can upload it
+# 2. Packages the HTTP handler, assistant orchestrator, organisation tool, and shared code
 # 3. Creates the actual live Lambda function from that zip
 # 4. Gives it a public web address (URL) so you can curl it
 
@@ -112,14 +112,19 @@ resource "aws_iam_role_policy" "answer_vector_database" {
 
 # Zip lambda handler - code that runs in lambda
 
-# Downloads instructor + pydantic into a build/ folder, and copies answer_lambda_handler.py in too.
+# Installs pinned runtime dependencies and copies only deployable Python modules into build/.
 # null_resource = "run this command" - not a real AWS thing, just a local action.
 resource "null_resource" "install_deps" {
   # triggers = re-run this step whenever requirements.txt or answer_lambda_handler.py changes.
   triggers = {
     requirements = filesha256("${path.module}/../app/api/requirements.txt")
     api_code = sha256(join("", [
-      for file in fileset("${path.module}/../app/api", "*.py") :
+      for file in [
+        "answer_lambda_handler.py",
+        "assistant_orchestrator.py",
+        "organisation_tools.py",
+        "retrieval.py"
+      ] :
       filesha256("${path.module}/../app/api/${file}")
     ]))
     shared_code = sha256(join("", [
@@ -133,7 +138,7 @@ resource "null_resource" "install_deps" {
   # copy the answer handler into that same build folder.
 
   provisioner "local-exec" {
-    command     = "if (Test-Path ${path.module}\\build) { Remove-Item -Recurse -Force ${path.module}\\build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\build; New-Item -ItemType Directory -Force ${path.module}\\build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\build\\askanydoc_rag"
+    command     = "if (Test-Path ${path.module}\\build) { Remove-Item -Recurse -Force ${path.module}\\build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\assistant_orchestrator.py,${path.module}\\..\\app\\api\\organisation_tools.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\build; New-Item -ItemType Directory -Force ${path.module}\\build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\build\\askanydoc_rag"
     interpreter = ["PowerShell", "-Command"]
   }
 }
@@ -168,6 +173,10 @@ resource "aws_lambda_function" "lambda_function" {
       ANSWER_MODEL_ID              = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
       EMBEDDING_MODEL_ID           = "amazon.titan-embed-text-v2:0"
       LANGFUSE_SECRET_ID           = "askanydoc/langfuse"
+      MAX_HISTORY_CHARACTERS       = "12000"
+      MAX_HISTORY_MESSAGES         = "12"
+      MAX_RESPONSE_TOKENS          = "2048"
+      MAX_TOOL_ROUNDS              = "2"
       MINIMUM_RETRIEVAL_SIMILARITY = "0.35"
       RETRIEVAL_RESULT_LIMIT       = "5"
       VECTOR_DATABASE_ARN          = aws_rds_cluster.vector_database.arn
