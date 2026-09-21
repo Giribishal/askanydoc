@@ -175,7 +175,7 @@ Documentation, tests, and isolated Microsoft adapter changes are authorised by t
 
 ## ADR-008 — 2026-09-21 — Select Graph Search with bounded extraction for the current test environment
 
-**Status:** accepted for local reconciliation and deployment planning; live deployment still requires the reviewed-plan approval gate.
+**Status:** accepted, deployed, and live-proven for Bishal; Adele/Alex permission proof remains incomplete.
 
 ### Before
 
@@ -201,3 +201,14 @@ Option A, Microsoft 365 Copilot Retrieval, was the preferred target. Option B re
 - AskAnyDoc owns bounded PDF parsing/ranking and must measure latency, Graph throttling, extraction quality, and Lambda resource use.
 - Graph Search is not represented as equivalent to Copilot semantic/hybrid retrieval.
 - Live Lambda/configuration deployment and any Entra consent change remain separately approval-controlled.
+
+## ADR-009 — 2026-09-21 — Propose a dedicated SharePoint retrieval Lambda
+
+**Status:** proposed; documentation only; not approved or implemented.
+
+- Keep one answer/orchestration Lambda so source routing, Bedrock finalization, evidence normalization, and citations have one owner.
+- Move only OBO, Graph Search, SharePoint download, and bounded extraction into a dedicated Lambda with a least-privilege role and independent metrics/concurrency controls.
+- Do not copy the full AWS answer Lambda and do not create a second complete application.
+- The design reduces deployment and dependency blast radius and allows measured concurrency isolation. It adds a small invocation charge and overlapping billed duration for synchronous calls.
+- Complete the current permission/latency baseline before migration. Any new Lambda, IAM, invocation permission, routing change, or deployment requires a fresh exact Terraform plan and explicit approval.
+- Detailed gates and rollback are in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`.

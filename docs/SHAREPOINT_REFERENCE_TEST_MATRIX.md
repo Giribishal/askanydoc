@@ -30,3 +30,14 @@ Every reference record must include: title, official URL, Microsoft product, top
 - allowed/denied decision;
 - latency and failure details;
 - whether the result met the expected outcome.
+
+## Executed evidence
+
+| Timestamp | Identity | Test | Result | Evidence |
+|---|---|---|---|---|
+| 2026-09-21 17:50 AEST | Bishal | General semantic question before download fallback | Failed closed | Graph Search found a permitted PDF; metadata omitted the download annotation; no content/citation returned |
+| 2026-09-21 17:58 AEST | Bishal | General semantic question after fallback | Pass | Grounded answer; `microsoft-cloud-hybrid-architecture.pdf` pages 1, 2, and 3; Lambda duration 13.4 seconds |
+| 2026-09-21 17:43 AEST | Unauthenticated | Protected `/chat` | Pass | HTTP 401; SharePoint tool not exposed |
+| 2026-09-21 18:00 AEST | Public AWS path | Known SQS question | Pass | `17-lambda-sqs-partial-batch-responses.pdf`, page 5; client latency 33.7 seconds |
+
+The Adele/Alex rows remain mandatory and incomplete.

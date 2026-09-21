@@ -184,3 +184,12 @@ This section supersedes the provider/source mismatch described in the earlier ch
 - Added a local fallback to Microsoft's documented `GET /drives/{drive-id}/items/{item-id}/content` contract. The code deliberately intercepts the 302 and downloads the preauthenticated HTTPS URL without forwarding the Graph bearer token to the storage host.
 - Added a regression test for the omitted-annotation path while retaining the existing bearer-token boundary test.
 - Verification: **86 tests passed, 10 skipped, plus 6 subtests passed**. No live code or configuration change has yet been made for this fix.
+## 2026-09-21 17:54–18:00 AEST — Download fallback deployed and live grounding proven
+
+- Bishal explicitly approved the narrow saved plan for commit `4645279`; it updated only the shared `askanydoc-api` package in place plus the local packaging trigger.
+- AWS reports active/successful with code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=`. No configuration, IAM, API Gateway, S3, Aurora, ingestion, frontend, or stored-data resource changed.
+- Bishal's authenticated semantic question succeeded after the fix. Graph Search selected permitted General-site content, the Lambda downloaded and extracted PDF pages, and the answer cited pages 1–3 of `microsoft-cloud-hybrid-architecture.pdf`.
+- SharePoint Lambda duration was 13.4 seconds, 6,204 input tokens, 319 output tokens, three citations, 170 MB maximum memory in a 512 MB function.
+- The known AWS SQS question passed again with the expected `17-lambda-sqs-partial-batch-responses.pdf`, page 5 citation; client latency was 33.7 seconds.
+- This proves Bishal's authenticated Option B vertical slice and AWS coexistence. It does not prove Adele/Alex isolation.
+- Recorded the recommended next architecture direction in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`: one answer/orchestrator plus a dedicated least-privilege SharePoint retrieval Lambda. The proposal is not approval to change IAM, routing, concurrency, or live infrastructure.
