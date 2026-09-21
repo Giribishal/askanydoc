@@ -1,7 +1,7 @@
 # AskAnyDoc SharePoint retrieval — current source of truth
 
 **Effective date:** 2026-09-21
-**Document version:** 1.7
+**Document version:** 1.8
 **Authority:** This document is the authoritative current execution plan for the SharePoint retrieval slice.
 **Historical records:** Older chats, trackers, ADRs, and implementation logs remain valuable history. If their current recommendation conflicts with this document, follow this document and record any future correction append-only.
 
@@ -24,19 +24,21 @@ last_applied_sharepoint_enabled_from_local_state: true
 copilot_live_proven: false
 copilot_commercial_gate: blocked_no_copilot_addon_and_no_retrieval_payg_policy
 sharepoint_effective_permission_matrix_proven: true
-direct_user_session_permission_matrix_proven: false
-adele_alex_retrieval_matrix_proven: false
+direct_user_session_permission_matrix_proven: true
+direct_sharepoint_site_access_matrix_proven: false
+adele_alex_retrieval_matrix_proven: true
 bishal_authenticated_graph_search_and_pdf_grounding_proven: true
 aws_retrieval_path_may_be_changed_without_explicit_approval: false
-terraform_apply_authorized: true
-deployment_authorized: true
-deployment_approval_recorded_at: 2026-09-21T17:39:49+10:00
+terraform_apply_authorized: false
+deployment_authorized: false
+last_deployment_approval_recorded_at: 2026-09-21T17:39:49+10:00
+last_deployment_approval_consumed: true
 deployment_status: deployed_option_b_to_askanydoc_api
 deployed_at: 2026-09-21T17:54:44+10:00
 deployed_commit: 4645279
 deployed_lambda_code_sha256: ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=
-next_action: Run direct authenticated Graph extraction and the Adele/Alex end-to-end permission matrix, then record latency and failure evidence
-last_automated_verification: 43 Python tests plus 6 subtests passed
+next_action: Complete the remaining non-identity matrix cases and read-only Entra consent inspection; keep direct SharePoint site-access verification as a separate Gate 3 item
+last_automated_verification: 86 Python tests passed, 10 skipped, plus 6 subtests passed
 frontend_current_lint_build: passed_with_existing_589_kb_bundle_warning
 terraform_current_validation: passed_with_terraform_1_16_3
 terraform_plan_status: applied_successfully_lambda_in_place_update_only_plus_local_build_trigger_replacement
@@ -47,9 +49,9 @@ terraform_plan_status: applied_successfully_lambda_in_place_update_only_plus_loc
 1. **Current choice:** Option B is selected for this test environment. Do not switch providers again unless Bishal explicitly reopens and records the decision.
 2. **Option A:** Keep the implementation, but do not deploy it in this tenant while the commercial gate is blocked.
 3. **Option C:** Do not implement it now. It is a future architecture triggered only by measured scale, cost, latency, SLA, or cross-system requirements.
-4. **Current live truth:** Option B is deployed with Graph Search enabled. Bishal's authenticated session proved search, bounded PDF extraction, grounded answering, and SharePoint page citations. Copilot Retrieval is not deployed or live-proven.
+4. **Current live truth:** Option B is deployed with Graph Search enabled. Bishal's authenticated session proved search, bounded PDF extraction, grounded answering, and SharePoint page citations. Isolated AskAnyDoc sessions now prove Adele can retrieve General but not Restricted evidence, while Alex can retrieve both with correct citations. Copilot Retrieval is not deployed or live-proven.
 5. **AWS protection:** do not modify AWS ingestion, S3, Titan, Aurora, pgvector, AWS retrieval, IAM, state, or data without the exact warning and Bishal's explicit approval immediately before the action.
-6. **Next action only:** the reviewed Option B plan is deployed. Run authenticated retrieval and the Adele/Alex permission matrix. Do not grant consent, change topology, or modify the protected AWS path without a new exact warning and approval.
+6. **Next action only:** the reviewed Option B plan is deployed and the Adele/Alex AskAnyDoc retrieval matrix has passed. Complete the remaining no-match, malformed/malicious-content, throttling, timeout, and read-only Entra-consent evidence. Do not grant consent, change topology, or modify the protected AWS path without a new exact warning and approval.
 7. **Historical text:** statements such as “Graph first” in older logs are history, not current instructions.
 8. **Uncertainty:** when permission, billing, tenant, plan, or blast radius is uncertain, stop before mutation and report the missing evidence.
 9. **Recording:** append evidence to the implementation log and root history; update the current-state sections here only when a verified superseding decision occurs.
@@ -140,7 +142,7 @@ Every SharePoint provider must satisfy all of the following:
 - Both Microsoft providers apply query-time site scoping and post-response URL validation.
 - Post-response validation requires an exact HTTPS host and an exact configured site-path boundary.
 - The Copilot adapter uses `POST https://graph.microsoft.com/v1.0/copilot/retrieval`, `dataSource: sharePoint`, a two-site `path:` filter, title metadata, and bounded results.
-- Automated verification currently passes: **43 Python tests plus 6 subtests**. The new tests cover Copilot's 1,500-character query limit, malformed JSON, invalid response shape, and retryable network failure mapping.
+- Automated verification after the Graph download fallback passes: **86 Python tests, 10 intentional skips, plus 6 subtests**. Coverage includes the Option B download fallback and bearer-token boundary as well as Copilot's query limit, malformed JSON, invalid response shape, and retryable network failure mapping.
 - The local frontend dependency installation was restored without downloading or replacing tracked source. Frontend lint and the production build pass. The existing approximately 589 kB JavaScript bundle warning remains a performance follow-up, not a correctness failure.
 
 ### 3.2 Applied/deployed evidence
@@ -153,9 +155,9 @@ Every SharePoint provider must satisfy all of the following:
 - The Copilot Billing & usage page showed no connected billing policy for its listed pay-as-you-go services and did not list Microsoft 365 Copilot Retrieval API as an enabled service.
 - Current Microsoft documentation requires at least one tenant Microsoft 365 Copilot license plus eligible Azure billing for nonlicensed-user Retrieval PAYG. Therefore Option A is commercially blocked in this tenant until eligibility is deliberately obtained or Microsoft changes the requirements.
 - Entra delegated permission/admin-consent status is not live-verified because the Entra portal requested a separate interactive authentication step. Local state confirms a JWT-protected `POST /chat` route with `access_as_user` and configured tenant/client/secret references, but local state is not proof of current Entra consent.
-- No current record proves the Adele/Alex retrieval permission matrix end to end.
+- The isolated Adele/Alex AskAnyDoc retrieval matrix passed on 2026-09-21. Alex retrieved both General and Restricted evidence with the expected citations. Adele retrieved the General evidence but received `organisation_not_found`, zero citations, and no Restricted URL or document-derived protection list for the identical Restricted query.
 - Terraform 1.16.3 is checksum-verified in the ignored project `tmp` directory; formatting and validation pass.
-- No Terraform apply, Lambda deployment, billing enablement, Entra permission grant, state migration, IAM change, database change, or AWS-path change is authorized by this document.
+- The recorded deployment approval was consumed by the completed reviewed apply. No further Terraform apply, Lambda deployment, billing enablement, Entra permission grant, state migration, IAM change, database change, or AWS-path change is authorized by this document.
 
 ### 3.2.1 Current Option B plan evidence
 
@@ -169,7 +171,7 @@ Every SharePoint provider must satisfy all of the following:
 - The first authenticated SharePoint request found a permitted PDF but failed closed because Graph omitted the optional download annotation. Commit `4645279` added the official `/content` redirect fallback without forwarding the bearer token to storage; 86 tests, 10 intentional skips, and 6 subtests passed.
 - The approved fix deployed successfully at 2026-09-21 07:54:44 UTC with code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=`.
 - Bishal's authenticated retest completed in 13.4 seconds of Lambda duration, returned a grounded architecture answer, and cited pages 1, 2, and 3 of `microsoft-cloud-hybrid-architecture.pdf` from the General site. A subsequent AWS regression again returned the expected SQS PDF/page citation in 33.7 seconds.
-- This proves the Option B vertical slice for Bishal, not user isolation. Adele and Alex remain the required permission matrix.
+- This proves the Option B vertical slice and user isolation for the tested AskAnyDoc questions. It does not yet prove every remaining failure/operational case or direct navigation to both SharePoint sites under each identity.
 - Keep the current single-Lambda architecture for the present test volume because it is simpler and avoids an extra synchronous invocation and overlapping billed duration. A dedicated SharePoint retrieval Lambda is documented in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md` as a deferred scale/reliability option, not the next mandatory migration. Reopen it only when measured triggers justify the extra topology and IAM.
 
 ### 3.3 SharePoint test corpus and identities
@@ -182,7 +184,18 @@ Every SharePoint provider must satisfy all of the following:
 - Alex is intended to read both general and restricted content.
 - Bishal is the administrative test identity and cannot substitute for the Adele/Alex isolation tests.
 - SharePoint's read-only **Check Permissions** tool now proves the effective site-level matrix: Adele has **Edit** on General and **None** on Restricted; Alex has **Edit** on both General and Restricted.
-- This proves the configured SharePoint permission boundary, but not yet isolated browser sign-in or end-to-end retrieval. Adele/Alex direct-session and AskAnyDoc retrieval tests remain required.
+- Isolated AskAnyDoc browser sessions now prove the end-to-end retrieval boundary: Adele can retrieve General evidence and is denied Restricted evidence; Alex can retrieve both. Direct SharePoint site navigation under each isolated identity remains a separate Gate 3 evidence item because a prior direct-site attempt retained Bishal's SharePoint cookie and was discarded as invalid evidence.
+
+### 3.3.1 Live Adele/Alex retrieval matrix — 2026-09-21
+
+| Identity | Question scope | Result | Evidence |
+|---|---|---|---|
+| Alex | General | Pass | 3 General-site citations to `microsoft-cloud-hybrid-architecture.pdf` pages 2, 1, and 3; Lambda 11.18 s |
+| Alex | Restricted | Pass | 1 Restricted-site citation to `sharepoint-sites-highly-regulated-data.pdf` page 1; Lambda 28.08 s |
+| Adele | General | Pass | 3 General-site citations to `microsoft-cloud-hybrid-architecture.pdf` pages 2, 1, and 3; Lambda 17.08 s |
+| Adele | Restricted | Pass (denied/no evidence) | `organisation_not_found`, 0 citations, no Restricted URL, and no Restricted document-derived protection list; Lambda 13.58 s |
+
+The first Alex filename-heavy query returned no match and is retained as query-sensitivity evidence, not as a permission failure. The controlled General and Restricted questions above were then held constant across identities.
 
 ### 3.4 Decision and implementation evolution
 
@@ -369,7 +382,7 @@ Do not select B merely because its API has no explicit Retrieval charge. Compare
 
 ### 6.7 Current AskAnyDoc status
 
-Implemented locally as `graph_search`, previously deployed, metadata lookup proven, semantic body-answer quality not proven. Retain as an explicit configured provider, not an automatic silent fallback from A.
+Implemented and deployed as `graph_search`. Semantic PDF-body answers, page citations, AWS coexistence, and the controlled Adele/Alex permission matrix are live-proven for the tested corpus. Retain as the explicit selected provider for this environment, not an automatic silent fallback from A.
 
 ## 7. Option C — custom permission-aware SharePoint index
 
@@ -761,14 +774,14 @@ Resume in this order:
 1. Read this document and the latest `PROJECT_HANDOFF.md` checkpoint.
 2. Treat Bishal's explicit 2026-09-21 selection of Option B as complete and recorded in ADR-008.
 3. Complete Gate 2 read-only Entra permission/admin-consent inspection after Bishal completes the portal's interactive authentication step.
-4. Complete direct sign-in checks as Adele and Alex. The admin-side effective permission matrix is proven, but isolated user sessions are not.
+4. Preserve the completed isolated AskAnyDoc sign-in matrix for Adele and Alex. Direct SharePoint site navigation under each isolated identity remains separately unproven and must not reuse an administrator's SharePoint cookie.
 5. Keep the verified exact site paths unchanged unless SharePoint Details produces a different canonical path.
-6. Preserve the current green local baseline: 43 Python tests plus 6 subtests, frontend lint, and frontend production build.
+6. Preserve the current green local baseline: 86 Python tests passed, 10 intentional skips, plus 6 subtests; frontend lint and frontend production build also pass.
 7. Preserve deployment identity: commit `4645279`, Lambda code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=`, applied 2026-09-21 17:54 AEST.
-8. Run direct authenticated Graph retrieval and bounded PDF extraction before relying on Claude's answer.
-9. Run the isolated Adele/Alex General/Restricted/no-match/citation matrix and record timestamps and outcomes.
-10. Preserve the completed AWS regression evidence and add cross-source testing only after both sources independently pass.
-11. Record latency, throttling, timeout, extraction-limit, token, and error evidence.
+8. Treat direct authenticated Graph retrieval and bounded PDF extraction as live-proven through the controlled General/Restricted tests; add a lower-level provider-only probe only if it supplies missing diagnostic evidence.
+9. Preserve the passed Adele/Alex General/Restricted matrix and complete the remaining generic no-match, malicious-content, timeout, throttling, and extraction-limit cases.
+10. Preserve the completed AWS regression evidence and add one explicit cross-source comparison now that both individual sources have passed their core retrieval gates.
+11. Continue recording latency, token, throttling, timeout, extraction-limit, and error evidence; the four identity tests already have Lambda duration/token/citation records.
 12. Compare the other provider only as an explicit evaluation after the selected path has evidence.
 13. Keep the single Lambda while the current bounds and tests meet the workload. Reopen the documented separation only for measured concurrency contention, repeated cross-source blast-radius incidents, independent deployment cadence, package/cold-start pressure, least-privilege audit requirements, or an unmet latency/SLA target. Do not alter the protected AWS path under the completed deployment approval.
 14. Keep Option C deferred until representative scale measurements justify a separate platform project.

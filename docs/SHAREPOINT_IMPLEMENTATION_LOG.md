@@ -199,3 +199,13 @@ This section supersedes the provider/source mismatch described in the earlier ch
 - The dedicated SharePoint retrieval Lambda is retained as a future option only, with measurable triggers recorded in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`.
 - Current code-level controls remain: authenticated tool exposure, OBO delegation, exact site allowlisting, bounded results/files/bytes/pages/excerpts, bounded retries/timeouts, fail-closed provider errors, and source-specific evidence/citations.
 - No live AWS, Microsoft, IAM, routing, state, code, configuration, or data change occurred for this decision.
+
+## 2026-09-21 18:32–18:56 AEST — Adele/Alex end-to-end retrieval matrix passed
+
+- Verified the identity displayed by AskAnyDoc before each isolated test session: Alex was `AlexW@y4m7.onmicrosoft.com`; Adele was `AdeleV@y4m7.onmicrosoft.com`.
+- Used the same controlled General question for both users. Both received grounded answers with three citations to `microsoft-cloud-hybrid-architecture.pdf` pages 2, 1, and 3 under the General site.
+- Used the same controlled Restricted question for both users. Alex received the Restricted document answer with one citation to `sharepoint-sites-highly-regulated-data.pdf` page 1. Adele received `organisation_not_found`, zero citations, no Restricted URL, and no Restricted document-derived protection list.
+- CloudWatch completion evidence: Alex General 11.18 s (6,204 input / 315 output tokens); Alex Restricted 28.08 s (8,029 / 604); Adele General 17.08 s (6,204 / 335); Adele Restricted denial 13.58 s (7,310 / 616). All four requests completed successfully at the Lambda boundary.
+- An earlier Alex filename-heavy query returned no match in 8.68 s. It is recorded as query-sensitivity evidence, not a permission failure.
+- This proves the core end-to-end AskAnyDoc permission matrix for the tested corpus and questions. It does not prove production readiness, the remaining operational/failure cases, or direct site navigation under each isolated identity.
+- No permissions, Entra consent, AWS resource, Lambda code/configuration, Terraform state, billing, IAM, routing, document, or protected AWS retrieval component changed during this test.
