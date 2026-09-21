@@ -193,3 +193,9 @@ This section supersedes the provider/source mismatch described in the earlier ch
 - The known AWS SQS question passed again with the expected `17-lambda-sqs-partial-batch-responses.pdf`, page 5 citation; client latency was 33.7 seconds.
 - This proves Bishal's authenticated Option B vertical slice and AWS coexistence. It does not prove Adele/Alex isolation.
 - Recorded the recommended next architecture direction in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`: one answer/orchestrator plus a dedicated least-privilege SharePoint retrieval Lambda. The proposal is not approval to change IAM, routing, concurrency, or live infrastructure.
+## 2026-09-21 — Single Lambda retained; separation deferred
+
+- Bishal chose the current single answer/orchestration Lambda for the present workload and cost profile.
+- The dedicated SharePoint retrieval Lambda is retained as a future option only, with measurable triggers recorded in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`.
+- Current code-level controls remain: authenticated tool exposure, OBO delegation, exact site allowlisting, bounded results/files/bytes/pages/excerpts, bounded retries/timeouts, fail-closed provider errors, and source-specific evidence/citations.
+- No live AWS, Microsoft, IAM, routing, state, code, configuration, or data change occurred for this decision.

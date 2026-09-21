@@ -202,9 +202,9 @@ Option A, Microsoft 365 Copilot Retrieval, was the preferred target. Option B re
 - Graph Search is not represented as equivalent to Copilot semantic/hybrid retrieval.
 - Live Lambda/configuration deployment and any Entra consent change remain separately approval-controlled.
 
-## ADR-009 — 2026-09-21 — Propose a dedicated SharePoint retrieval Lambda
+## ADR-009 — 2026-09-21 — Defer a dedicated SharePoint retrieval Lambda until measured need
 
-**Status:** proposed; documentation only; not approved or implemented.
+**Status:** deferred future option; documentation only; not approved or implemented.
 
 - Keep one answer/orchestration Lambda so source routing, Bedrock finalization, evidence normalization, and citations have one owner.
 - Move only OBO, Graph Search, SharePoint download, and bounded extraction into a dedicated Lambda with a least-privilege role and independent metrics/concurrency controls.
@@ -212,3 +212,4 @@ Option A, Microsoft 365 Copilot Retrieval, was the preferred target. Option B re
 - The design reduces deployment and dependency blast radius and allows measured concurrency isolation. It adds a small invocation charge and overlapping billed duration for synchronous calls.
 - Complete the current permission/latency baseline before migration. Any new Lambda, IAM, invocation permission, routing change, or deployment requires a fresh exact Terraform plan and explicit approval.
 - Detailed gates and rollback are in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`.
+- For the current volume, retain the single Lambda because it is simpler and avoids the extra synchronous invocation and overlapping billed duration. Reopen separation only for measured concurrency contention, blast-radius incidents, independent release ownership, package/cold-start pressure, least-privilege audit requirements, or unmet latency/SLA targets.

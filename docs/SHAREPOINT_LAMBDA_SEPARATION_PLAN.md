@@ -1,12 +1,23 @@
 # Proposed SharePoint Lambda separation plan
 
-**Status:** proposed architecture; documentation only; not approved or implemented
+**Status:** deferred future option; documentation only; not approved or implemented
 **Recorded:** 2026-09-21
 **Authority:** `SHAREPOINT_RETRIEVAL_SOURCE_OF_TRUTH.md` remains authoritative for the live system.
 
-## Recommendation
+## Future option
 
-Separate Microsoft retrieval into a dedicated `askanydoc-sharepoint-retrieval` Lambda, while retaining one small answer/orchestration Lambda. Do not copy the complete AWS answer Lambda and do not create a second complete AskAnyDoc application.
+If measured scale, reliability, security, or deployment evidence later requires isolation, separate Microsoft retrieval into a dedicated `askanydoc-sharepoint-retrieval` Lambda while retaining one small answer/orchestration Lambda. Do not copy the complete AWS answer Lambda and do not create a second complete AskAnyDoc application.
+
+For the current test environment, keep the deployed single-Lambda architecture. It is simpler, avoids an extra synchronous invocation and overlapping billed duration, and already passes the Bishal SharePoint grounding and AWS regression checks.
+
+Reopen this option only when at least one trigger is measured:
+
+- SharePoint traffic consumes concurrency needed by AWS questions;
+- repeated SharePoint failures or deployments disrupt the AWS path;
+- SharePoint needs an independent release cadence or operational owner;
+- package size, cold starts, memory, or timeout materially miss an agreed target;
+- a least-privilege review requires the Entra secret and Microsoft network access to be isolated;
+- representative load tests show that independent scaling or throttling is necessary.
 
 ```text
 React + MSAL
@@ -87,4 +98,3 @@ Microsoft's OBO rule remains unchanged: the protected middle-tier exchanges the 
 - AWS serverless AI architecture guidance: https://docs.aws.amazon.com/prescriptive-guidance/latest/agentic-ai-serverless/designing-serverless-ai-architectures.html
 - Microsoft OBO guidance: https://learn.microsoft.com/en-us/entra/msidweb/call-downstream-apis/from-web-apis
 - Microsoft Zero Trust API-to-API guidance: https://learn.microsoft.com/en-us/security/zero-trust/develop/api-calls-api
-

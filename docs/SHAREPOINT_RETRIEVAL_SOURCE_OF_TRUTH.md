@@ -1,7 +1,7 @@
 # AskAnyDoc SharePoint retrieval — current source of truth
 
 **Effective date:** 2026-09-21
-**Document version:** 1.6
+**Document version:** 1.7
 **Authority:** This document is the authoritative current execution plan for the SharePoint retrieval slice.
 **Historical records:** Older chats, trackers, ADRs, and implementation logs remain valuable history. If their current recommendation conflicts with this document, follow this document and record any future correction append-only.
 
@@ -170,7 +170,7 @@ Every SharePoint provider must satisfy all of the following:
 - The approved fix deployed successfully at 2026-09-21 07:54:44 UTC with code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=`.
 - Bishal's authenticated retest completed in 13.4 seconds of Lambda duration, returned a grounded architecture answer, and cited pages 1, 2, and 3 of `microsoft-cloud-hybrid-architecture.pdf` from the General site. A subsequent AWS regression again returned the expected SQS PDF/page citation in 33.7 seconds.
 - This proves the Option B vertical slice for Bishal, not user isolation. Adele and Alex remain the required permission matrix.
-- A dedicated SharePoint retrieval Lambda is now the recommended production-direction separation, documented in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`. It is a proposal only and requires a new reviewed IAM/topology plan and explicit approval.
+- Keep the current single-Lambda architecture for the present test volume because it is simpler and avoids an extra synchronous invocation and overlapping billed duration. A dedicated SharePoint retrieval Lambda is documented in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md` as a deferred scale/reliability option, not the next mandatory migration. Reopen it only when measured triggers justify the extra topology and IAM.
 
 ### 3.3 SharePoint test corpus and identities
 
@@ -770,7 +770,7 @@ Resume in this order:
 10. Preserve the completed AWS regression evidence and add cross-source testing only after both sources independently pass.
 11. Record latency, throttling, timeout, extraction-limit, token, and error evidence.
 12. Compare the other provider only as an explicit evaluation after the selected path has evidence.
-13. Design reliability/decoupling separately using current official AWS and Microsoft guidance and measured failure/latency data. Do not alter the protected AWS path under the completed deployment approval.
+13. Keep the single Lambda while the current bounds and tests meet the workload. Reopen the documented separation only for measured concurrency contention, repeated cross-source blast-radius incidents, independent deployment cadence, package/cold-start pressure, least-privilege audit requirements, or an unmet latency/SLA target. Do not alter the protected AWS path under the completed deployment approval.
 14. Keep Option C deferred until representative scale measurements justify a separate platform project.
 
 ## 17. Official references to recheck
