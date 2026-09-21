@@ -2,7 +2,7 @@
 
 **Project 1 of 3 · Weeks 1–6 · Hybrid AI and RAG assistant on AWS**
 
-## Status: 🔄 In progress — AWS hybrid core working; permission-aware SharePoint slice gated on identity tests
+## Status: 🔄 In progress — AWS hybrid core working; Option B SharePoint identity matrix passed; operational hardening remains
 
 - Started: 2026-06-13
 - Shipped v1.0: (TBD)
@@ -29,9 +29,9 @@
 - The browser sends bounded recent history for follow-ups. Responses distinguish conversation, general knowledge, organisation evidence, and missing organisation information.
 - Organisation citations are built from stored provenance only after the application validates Claude's selected evidence numbers.
 - The first Microsoft 365 slice now has Entra/MSAL, an API Gateway JWT boundary, delegated on-behalf-of exchange, SharePoint providers, source routing, and a two-site/two-user test environment in the working tree.
-- Bishal reported 8 general and 4 restricted SharePoint documents uploaded. Permission-isolated retrieval is not yet verified, so SharePoint is not claimed production-ready.
-- Option B—delegated Microsoft Graph Search plus bounded on-demand PDF extraction—is selected for the current test environment because the tenant lacks Copilot Retrieval commercial eligibility. Terraform still defaults SharePoint off in checked-in source; delegated consent, user-isolated retrieval tests, a reviewed plan, and explicit approval are required before any apply.
-- Local source routing now exposes a clearly scoped `search_aws_documents` tool and adds `search_sharepoint` only for an enabled request with validated Microsoft identity. It searches one likely source by default, both only when the request needs both, and allows one bounded different-source fallback. This change is tested but not deployed.
+- The SharePoint corpus contains 8 general and 4 restricted documents. The controlled identity matrix is live-proven: Alex retrieved General and Restricted sources with correct citations; Adele retrieved General and received no Restricted evidence or citation.
+- Option B—delegated Microsoft Graph Search plus bounded on-demand PDF extraction—is selected and deployed for the current test environment because the tenant lacks Copilot Retrieval commercial eligibility. Checked-in Terraform still defaults SharePoint off; the live test environment uses reviewed values. The previous deployment approval is consumed, so every future apply requires a fresh reviewed plan and explicit approval.
+- Live source routing exposes `search_aws_documents` and adds `search_sharepoint` only for an enabled request with validated Microsoft identity. It searches one likely source by default, both only when required, and permits one bounded different-source fallback.
 - Current SharePoint execution authority: `docs/SHAREPOINT_RETRIEVAL_SOURCE_OF_TRUTH.md`. It records Options A/B/C, permissions, current versus deployed state, exact gates, approval boundaries, rollback, and next actions.
 
 ### Week 2 outcome
@@ -48,7 +48,7 @@ Prompt-tutorial and assigned-reading status remain personal learning-log follow-
 ### Current verified hybrid boundary
 
 - Direct S3/AWS SDK ingestion and custom pgvector retrieval are working end to end.
-- A public Function URL still exists for the historical AWS-only demo path. It is not an acceptable SharePoint identity boundary. The working tree/local state now also contain CloudFront/private-S3 frontend delivery and an API Gateway/Entra JWT path; live identity/permission regression remains pending.
+- A public Function URL still exists for the historical AWS-only demo path. It is not an acceptable SharePoint identity boundary. CloudFront/private-S3 frontend delivery plus the API Gateway/Entra JWT path now carry the permission-tested SharePoint flow; Function URL retirement remains a separate approval-controlled hardening change.
 - Retrieval currently uses top-5 cosine similarity with a configurable `0.35` minimum. This threshold must be calibrated with the F5 evaluation set rather than treated as universally optimal.
 - Claude Haiku 4.5 is configuration-selected through the AU inference profile. Model quality, latency, lifecycle, and cost must be evaluated before a company rollout.
 - Recent history is client-supplied and browser-local. Authentication, server-owned sessions, tenant isolation, and source ACL filtering remain mandatory company-deployment gates.

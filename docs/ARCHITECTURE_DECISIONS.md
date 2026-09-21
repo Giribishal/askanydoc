@@ -33,7 +33,7 @@ This preserves the learning value and proven behavior of the AWS vertical slice 
 
 ## ADR-002 — 2026-09-21 — Microsoft access uses SPA sign-in, protected API, and delegated on-behalf-of retrieval
 
-**Status:** accepted target; implementation exists but the two-user permission matrix is not yet verified.
+**Status:** accepted target; protected API/OBO implementation exists and the controlled two-user AskAnyDoc permission matrix passed on 2026-09-21. Direct isolated SharePoint-site navigation and broader operational cases remain open.
 
 ### Before
 
@@ -175,7 +175,7 @@ Documentation, tests, and isolated Microsoft adapter changes are authorised by t
 
 ## ADR-008 — 2026-09-21 — Select Graph Search with bounded extraction for the current test environment
 
-**Status:** accepted, deployed, and live-proven for Bishal; Adele/Alex permission proof remains incomplete.
+**Status:** accepted, deployed, and permission-proven for the controlled Adele/Alex AskAnyDoc matrix; broader operational/security evidence remains incomplete.
 
 ### Before
 
@@ -188,6 +188,7 @@ Option A, Microsoft 365 Copilot Retrieval, was the preferred target. Option B re
 - Current Microsoft prerequisites require at least one tenant Copilot license plus eligible Azure billing for nonlicensed-user PAYG Retrieval.
 - The local Option B adapter already uses OBO delegated identity, permission-trimmed Graph Search, approved-site query and response filtering, bounded PDF download/extraction, and application-controlled citations.
 - SharePoint effective permissions are proven: Adele = General Edit / Restricted None; Alex = Edit on both.
+- Isolated AskAnyDoc sessions proved the same effective retrieval boundary: Alex retrieved General and Restricted evidence; Adele retrieved General and received zero Restricted citations/evidence for the identical Restricted query.
 
 ### Decision
 

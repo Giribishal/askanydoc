@@ -2,7 +2,7 @@
 
 > **Execution authority:** Use this checklist only with `SHAREPOINT_RETRIEVAL_SOURCE_OF_TRUTH.md`. That document defines the selected provider, exact order, current evidence, approval requirements, and safe stopping points.
 
-> **Status correction — 2026-09-21:** local Terraform state records this feature as enabled with `graph_search`; therefore item 8 is no longer an effective live control. Terraform source now expresses the agreed target safely—disabled, Copilot Retrieval, and placeholder URLs—but those defaults intentionally differ from applied state. Confirm Copilot entitlement/licensing or pay-as-you-go billing, grant only the required delegated consent, supply approved environment values, complete the Adele/Alex permission matrix, run a protected-API OBO Copilot smoke test and AWS regression, then review the Terraform plan and obtain explicit approval before applying.
+> **Status correction — 2026-09-21 end of day:** Option B is deployed with `graph_search`; checked-in Terraform defaults remain disabled with placeholder URLs and provider `graph_search`. The protected API/OBO flow, AWS regression, and controlled Adele/Alex AskAnyDoc permission matrix passed. Copilot Retrieval remains commercially blocked. Still verify Entra consent read-only and direct isolated SharePoint-site access, then complete timeout/throttling/extraction/adversarial cases. The prior deployment approval is consumed; any further apply or permission change requires a fresh warning, plan, and explicit approval.
 
 1. Register a single-tenant web application in Microsoft Entra ID.
 2. Add the deployed HTTPS redirect URI; do not use the current HTTP S3 website.
