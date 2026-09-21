@@ -176,3 +176,11 @@ This section supersedes the provider/source mismatch described in the earlier ch
 - The protected endpoint returned HTTP 401 without a bearer token, confirming that SharePoint retrieval is not exposed anonymously through that route.
 - Remaining evidence: direct authenticated Graph extraction; isolated Adele General/Restricted tests; isolated Alex General/Restricted tests; SharePoint citations, no-match, throttling/timeout, and latency observations.
 - Reliability/decoupling remains a separately scoped design follow-up. The deployed shared Lambda is not being described as the final large-enterprise topology.
+## 2026-09-21 17:50 AEST — First authenticated Option B test exposed download fallback gap
+
+- Bishal's authenticated session successfully reached the protected API, OBO exchange, delegated Graph Search, and a permitted PDF candidate.
+- The request then failed closed before document content or an answer was returned because the drive-item metadata response omitted `@microsoft.graph.downloadUrl`.
+- CloudWatch recorded `SharePointError: Microsoft Graph omitted a valid download URL`; no token or document body was logged.
+- Added a local fallback to Microsoft's documented `GET /drives/{drive-id}/items/{item-id}/content` contract. The code deliberately intercepts the 302 and downloads the preauthenticated HTTPS URL without forwarding the Graph bearer token to the storage host.
+- Added a regression test for the omitted-annotation path while retaining the existing bearer-token boundary test.
+- Verification: **86 tests passed, 10 skipped, plus 6 subtests passed**. No live code or configuration change has yet been made for this fix.

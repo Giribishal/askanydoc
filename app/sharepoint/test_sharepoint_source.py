@@ -1,4 +1,5 @@
 import json
+from email.message import Message
 import urllib.error
 import urllib.request
 
@@ -335,3 +336,42 @@ def test_graph_download_never_forwards_bearer_token_to_storage_host(monkeypatch)
     assert _download_drive_item("secret-token", "drive", "item", 100, 8) == b"%PDF"
     assert calls[0][0].get_header("Authorization") == "Bearer secret-token"
     assert calls[1][0] == "https://storage.example/file"
+
+
+def test_graph_download_uses_content_redirect_when_annotation_is_omitted(monkeypatch):
+    calls = []
+
+    class Response:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, *_args):
+            return self.body
+
+    class ContentOpener:
+        def open(self, request, timeout):
+            calls.append((request, timeout))
+            headers = Message()
+            headers["Location"] = "https://storage.example/content-file"
+            raise urllib.error.HTTPError(request.full_url, 302, "Found", headers, None)
+
+    def fake_urlopen(request, timeout):
+        calls.append((request, timeout))
+        if isinstance(request, urllib.request.Request):
+            return Response(json.dumps({"size": 4}).encode("utf-8"))
+        return Response(b"%PDF")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *_handlers: ContentOpener())
+
+    assert _download_drive_item("secret-token", "drive", "item", 100, 8) == b"%PDF"
+    assert calls[0][0].get_header("Authorization") == "Bearer secret-token"
+    assert calls[1][0].full_url.endswith("/drives/drive/items/item/content")
+    assert calls[1][0].get_header("Authorization") == "Bearer secret-token"
+    assert calls[2][0] == "https://storage.example/content-file"

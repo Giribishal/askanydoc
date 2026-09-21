@@ -19,6 +19,13 @@ from .sharepoint_source import SharePointError, match_allowed_site
 _HTML_TAG = re.compile(r"<[^>]+>")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Expose Graph's redirect so its bearer token is never sent to storage."""
+
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        return None
+
+
 def _quote_kql_value(value: str) -> str:
     """Quote a trusted configuration value for a KQL property restriction."""
     return value.replace("\\", "\\\\").replace('"', '\\"')
@@ -80,6 +87,33 @@ def _download_drive_item(
     if isinstance(size, int) and size > maximum_bytes:
         raise SharePointError("document_too_large", "The SharePoint file exceeds the byte limit")
     download_url = metadata.get("@microsoft.graph.downloadUrl")
+    if not isinstance(download_url, str) or urllib.parse.urlparse(download_url).scheme != "https":
+        # The annotation is short-lived and can be omitted. Microsoft's documented
+        # server-side download contract is /content, which responds with a 302 to
+        # the same kind of preauthenticated storage URL. Deliberately stop automatic
+        # redirects so the Graph bearer token cannot cross to that storage host.
+        content_request = urllib.request.Request(
+            f"https://graph.microsoft.com/v1.0/drives/{quoted_drive}/items/{quoted_item}/content",
+            headers={"Authorization": f"Bearer {graph_token}"},
+        )
+        opener = urllib.request.build_opener(_NoRedirect())
+        try:
+            with opener.open(content_request, timeout=timeout_seconds):
+                raise SharePointError(
+                    "malformed_response",
+                    "Microsoft Graph returned file content without the documented redirect",
+                )
+        except urllib.error.HTTPError as error:
+            if error.code != 302:
+                raise _error_from_http(error, "file content request") from error
+            download_url = error.headers.get("Location")
+        except TimeoutError as error:
+            raise SharePointError(
+                "sharepoint_timeout",
+                "Microsoft Graph file content request timed out",
+                retryable=True,
+            ) from error
+
     if not isinstance(download_url, str) or urllib.parse.urlparse(download_url).scheme != "https":
         raise SharePointError("malformed_response", "Microsoft Graph omitted a valid download URL")
 
