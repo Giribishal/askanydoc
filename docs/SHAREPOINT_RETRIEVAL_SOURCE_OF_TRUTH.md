@@ -1,7 +1,7 @@
 # AskAnyDoc SharePoint retrieval — current source of truth
 
 **Effective date:** 2026-09-21
-**Document version:** 1.4
+**Document version:** 1.5
 **Authority:** This document is the authoritative current execution plan for the SharePoint retrieval slice.
 **Historical records:** Older chats, trackers, ADRs, and implementation logs remain valuable history. If their current recommendation conflicts with this document, follow this document and record any future correction append-only.
 
@@ -30,11 +30,15 @@ aws_retrieval_path_may_be_changed_without_explicit_approval: false
 terraform_apply_authorized: true
 deployment_authorized: true
 deployment_approval_recorded_at: 2026-09-21T17:39:49+10:00
-next_action: Create the requested Git checkpoint, then apply only the reviewed Option B plan and run Gates 7 through 10
+deployment_status: deployed_option_b_to_askanydoc_api
+deployed_at: 2026-09-21T17:41:27+10:00
+deployed_commit: 39f2474
+deployed_lambda_code_sha256: T51h5B4tXxhOFCriUnlNTdf4BQ8OEGpwc1PhFxPEjgg=
+next_action: Run direct authenticated Graph extraction and the Adele/Alex end-to-end permission matrix, then record latency and failure evidence
 last_automated_verification: 43 Python tests plus 6 subtests passed
 frontend_current_lint_build: passed_with_existing_589_kb_bundle_warning
 terraform_current_validation: passed_with_terraform_1_16_3
-terraform_plan_status: prepared_no_apply_lambda_in_place_update_only_plus_local_build_trigger_replacement
+terraform_plan_status: applied_successfully_lambda_in_place_update_only_plus_local_build_trigger_replacement
 ```
 
 ### Mandatory interpretation rules
@@ -44,7 +48,7 @@ terraform_plan_status: prepared_no_apply_lambda_in_place_update_only_plus_local_
 3. **Option C:** Do not implement it now. It is a future architecture triggered only by measured scale, cost, latency, SLA, or cross-system requirements.
 4. **Current live truth:** local source targets Copilot but is disabled by default; inspected applied state still records enabled Graph Search. Do not describe Copilot as deployed or working live.
 5. **AWS protection:** do not modify AWS ingestion, S3, Titan, Aurora, pgvector, AWS retrieval, IAM, state, or data without the exact warning and Bishal's explicit approval immediately before the action.
-6. **Next action only:** verify Entra configuration and consent read-only, then prepare the Option B plan. Do not deploy, grant consent, or apply Terraform without the exact reviewed-plan approval.
+6. **Next action only:** the reviewed Option B plan is deployed. Run authenticated retrieval and the Adele/Alex permission matrix. Do not grant consent, change topology, or modify the protected AWS path without a new exact warning and approval.
 7. **Historical text:** statements such as “Graph first” in older logs are history, not current instructions.
 8. **Uncertainty:** when permission, billing, tenant, plan, or blast radius is uncertain, stop before mutation and report the missing evidence.
 9. **Recording:** append evidence to the implementation log and root history; update the current-state sections here only when a verified superseding decision occurs.
@@ -157,7 +161,10 @@ Every SharePoint provider must satisfy all of the following:
 - The saved Option B plan proposes only an in-place update of `aws_lambda_function.lambda_function` (`askanydoc-api`) plus replacement of the local `null_resource.install_deps` packaging trigger and a reread of the local ZIP data source.
 - Planned environment remains `SHAREPOINT_ENABLED=true`, `SHAREPOINT_PROVIDER=graph_search`, the two verified site URLs, and `SHAREPOINT_MAX_RESULTS=10`.
 - The plan contains no create/delete/replacement for S3, Aurora, pgvector, IAM, API Gateway, CloudFront, the Function URL, ingestion Lambda, queues, secrets, or databases.
-- The saved plan has not been applied. Bishal gave explicit Gate 6 approval at 2026-09-21 17:39:49 +10:00 after reviewing the shared-Lambda blast radius, failure modes, cost exposure, rollback, and verification plan. He also requested a Git checkpoint immediately before apply.
+- Bishal gave explicit Gate 6 approval at 2026-09-21 17:39:49 +10:00 after reviewing the shared-Lambda blast radius, failure modes, cost exposure, rollback, and verification plan. Commit `39f2474` was created immediately before apply.
+- The reviewed plan applied successfully. Lambda `askanydoc-api` was updated in place at 2026-09-21 07:41:27 UTC with code SHA-256 `T51h5B4tXxhOFCriUnlNTdf4BQ8OEGpwc1PhFxPEjgg=`. AWS reports `Active` and `LastUpdateStatus=Successful`.
+- Live configuration reports SharePoint enabled, provider `graph_search`, the exact General and Restricted site allowlist, and 10 maximum results.
+- A live known AWS-corpus question passed with the expected `17-lambda-sqs-partial-batch-responses.pdf`, page 5 citation. The protected `/chat` endpoint returned HTTP 401 without a token. This proves the AWS smoke path and unauthenticated denial after deployment; it does not prove the Adele/Alex SharePoint matrix.
 
 ### 3.3 SharePoint test corpus and identities
 
@@ -751,13 +758,13 @@ Resume in this order:
 4. Complete direct sign-in checks as Adele and Alex. The admin-side effective permission matrix is proven, but isolated user sessions are not.
 5. Keep the verified exact site paths unchanged unless SharePoint Details produces a different canonical path.
 6. Preserve the current green local baseline: 43 Python tests plus 6 subtests, frontend lint, and frontend production build.
-7. Make Terraform available through the project-approved workflow, then run format and validation.
-8. Prepare—but do not apply—the complete Terraform plan for the explicitly selected provider.
-9. Present the exact deployment warning, commercial exposure, rollback, and reviewed plan to Bishal.
-10. Obtain explicit approval immediately before deployment.
-11. Deploy only the selected provider in the controlled test environment without modifying the protected AWS retrieval path.
-12. Run direct retrieval, identity matrix, citations, failures, AWS regression, and observability gates.
-13. Compare the other provider only as an explicit evaluation after the selected path has evidence.
+7. Preserve deployment identity: commit `39f2474`, Lambda code SHA-256 `T51h5B4tXxhOFCriUnlNTdf4BQ8OEGpwc1PhFxPEjgg=`, applied 2026-09-21 17:41 AEST.
+8. Run direct authenticated Graph retrieval and bounded PDF extraction before relying on Claude's answer.
+9. Run the isolated Adele/Alex General/Restricted/no-match/citation matrix and record timestamps and outcomes.
+10. Preserve the completed AWS regression evidence and add cross-source testing only after both sources independently pass.
+11. Record latency, throttling, timeout, extraction-limit, token, and error evidence.
+12. Compare the other provider only as an explicit evaluation after the selected path has evidence.
+13. Design reliability/decoupling separately using current official AWS and Microsoft guidance and measured failure/latency data. Do not alter the protected AWS path under the completed deployment approval.
 14. Keep Option C deferred until representative scale measurements justify a separate platform project.
 
 ## 17. Official references to recheck

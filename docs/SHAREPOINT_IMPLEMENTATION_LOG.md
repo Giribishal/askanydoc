@@ -165,3 +165,14 @@ This section supersedes the provider/source mismatch described in the earlier ch
 - Bishal requested a Git checkpoint before deployment so the reviewed source can be recovered.
 - The reliability and decoupling concern is recorded as a separate follow-up architecture phase. It must use current AWS and Microsoft guidance, measured evidence, and a separately reviewed plan; it does not broaden this deployment approval or authorize changes to the protected AWS retrieval path.
 - Immediate sequence: checkpoint, apply the exact saved plan, capture deployed identity/timestamp, test SharePoint permission boundaries and citations, then regress the existing AWS path.
+
+## 2026-09-21 17:41 AEST — Option B deployed and initial regression passed
+
+- Created recovery checkpoint commit `39f2474` before deployment.
+- Applied only the reviewed saved Terraform plan. Terraform reported one local packaging-trigger replacement and one in-place update of `aws_lambda_function.lambda_function`; no protected AWS-path or other cloud resource was changed.
+- AWS reports `askanydoc-api` active with successful last update, Python 3.13, 60-second timeout, 512 MB memory, and code SHA-256 `T51h5B4tXxhOFCriUnlNTdf4BQ8OEGpwc1PhFxPEjgg=`.
+- Verified live SharePoint environment values: enabled, provider `graph_search`, exact General/Restricted site URLs, and 10 maximum results.
+- Live AWS regression passed for “What problem does SQS partial batch response solve?” with a grounded answer citing `17-lambda-sqs-partial-batch-responses.pdf`, page 5.
+- The protected endpoint returned HTTP 401 without a bearer token, confirming that SharePoint retrieval is not exposed anonymously through that route.
+- Remaining evidence: direct authenticated Graph extraction; isolated Adele General/Restricted tests; isolated Alex General/Restricted tests; SharePoint citations, no-match, throttling/timeout, and latency observations.
+- Reliability/decoupling remains a separately scoped design follow-up. The deployed shared Lambda is not being described as the final large-enterprise topology.
