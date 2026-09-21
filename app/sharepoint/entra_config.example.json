@@ -1,0 +1,15 @@
+{
+  "tenant_id": "REPLACE_WITH_TENANT_ID",
+  "client_id": "REPLACE_WITH_APP_REGISTRATION_CLIENT_ID",
+  "authority": "https://login.microsoftonline.com/REPLACE_WITH_TENANT_ID",
+  "redirect_uri": "https://REPLACE_WITH_CLOUDFRONT_HOST/auth/callback",
+  "scopes": [
+    "openid",
+    "profile",
+    "offline_access",
+    "User.Read",
+    "Files.Read.All",
+    "Sites.Read.All"
+  ],
+  "notes": "Delegated scopes only; do not commit client secrets or access tokens. Narrow scopes after the first verified slice."
+}

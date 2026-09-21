@@ -45,6 +45,26 @@ h1 {
   letter-spacing: -0.5px;
 }
 
+.auth-notice,
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--ai-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ai-text);
+}
+
+.auth-notice button,
+.auth-row button {
+  min-height: 38px;
+  padding: 0 16px;
+}
+
 /* ---- the chat area: grows to fill space, scrolls when full ---- */
 .chat {
   flex: 1;                   /* take up all remaining height */
@@ -129,6 +149,11 @@ h1 {
 .citations ul {
   margin: 5px 0 0;
   padding-left: 18px;
+}
+
+.citations a {
+  color: #176b87;
+  text-decoration: underline;
 }
 
 /* ---- the input row pinned at the bottom ---- */

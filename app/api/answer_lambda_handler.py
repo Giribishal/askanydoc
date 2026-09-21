@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import traceback
 from functools import lru_cache
 from typing import Any
 
@@ -41,9 +42,30 @@ def _flush_tracing(tracing_enabled: bool) -> None:
 
 
 @observe(name="hybrid-assistant", as_type="generation", capture_input=False, capture_output=False)
-def answer_question(question: str, history: list[dict[str, str]]) -> dict[str, Any]:
+def answer_question(
+    question: str,
+    history: list[dict[str, str]],
+    auth_context: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Run one privacy-conscious, Claude-led hybrid assistant turn."""
-    return run_assistant(question, history)
+    return run_assistant(question, history, auth_context)
+
+
+def _auth_context(event: dict[str, Any]) -> dict[str, str] | None:
+    """Read only identity already validated by the API Gateway JWT authorizer."""
+    jwt = event.get("requestContext", {}).get("authorizer", {}).get("jwt", {})
+    claims = jwt.get("claims", {}) if isinstance(jwt, dict) else {}
+    user_id = claims.get("oid") or claims.get("sub")
+    tenant_id = claims.get("tid")
+    headers = {str(key).lower(): value for key, value in event.get("headers", {}).items()}
+    authorization = headers.get("authorization", "")
+    if not user_id or not tenant_id or not authorization.lower().startswith("bearer "):
+        return None
+    return {
+        "user_id": str(user_id),
+        "tenant_id": str(tenant_id),
+        "access_token": authorization.split(" ", 1)[1].strip(),
+    }
 
 
 def _validated_history(value: Any) -> list[dict[str, str]]:
@@ -119,7 +141,7 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     question_hash = hashlib.sha256(question.encode("utf-8")).hexdigest()[:12]
     tracing_enabled = configure_langfuse()
     try:
-        payload = answer_question(question, history)
+        payload = answer_question(question, history, _auth_context(event))
         print(json.dumps({
             "event": "answer_completed",
             "request_id": request_id,
@@ -132,12 +154,21 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         }))
         return _response(200, payload)
     except Exception as error:
-        print(json.dumps({
+        failure = {
             "event": "answer_failed",
             "request_id": request_id,
             "question_hash": question_hash,
+            "history_messages": len(history),
             "error_type": type(error).__name__,
-        }))
+            "error_message": str(error),
+            "failure_stage": getattr(error, "failure_stage", "answer_question"),
+            "error_code": getattr(error, "error_code", "unclassified_exception"),
+            "traceback": traceback.format_exc(limit=12),
+        }
+        diagnostics = getattr(error, "diagnostics", None)
+        if isinstance(diagnostics, dict):
+            failure["diagnostics"] = diagnostics
+        print(json.dumps(failure, default=str))
         return _response(503, {
             "error": "AskAnyDoc could not complete the answer. Please try again.",
             "request_id": request_id,

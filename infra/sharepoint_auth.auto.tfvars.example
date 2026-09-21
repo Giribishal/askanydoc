@@ -1,0 +1,13 @@
+entra_tenant_id     = "00000000-0000-0000-0000-000000000000"
+entra_api_client_id = "00000000-0000-0000-0000-000000000000"
+entra_api_scope      = "api://00000000-0000-0000-0000-000000000000/access_as_user"
+entra_api_scope_name = "access_as_user"
+
+# SharePoint retrieval is deliberately disabled by default. Graph Search with
+# bounded extraction is selected for the current test environment; set
+# enabled=true only after consent, identity, and permission tests are ready.
+sharepoint_enabled             = false
+sharepoint_provider            = "graph_search"
+sharepoint_general_site_url    = "https://tenant.sharepoint.com/sites/general"
+sharepoint_restricted_site_url = "https://tenant.sharepoint.com/sites/restricted"
+sharepoint_max_results         = 10

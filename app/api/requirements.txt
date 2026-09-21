@@ -72,6 +72,8 @@ pydantic==2.13.5
     # via langfuse
 pydantic-core==2.46.5
     # via pydantic
+pypdf==6.17.0
+    # via -r app/api/requirements.in
 python-dateutil==2.9.0.post0
     # via botocore
 requests==2.34.2

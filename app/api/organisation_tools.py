@@ -5,37 +5,84 @@ from __future__ import annotations
 from typing import Any
 
 from retrieval import retrieve_evidence
+from sharepoint.graph_search_provider import GraphSearchProvider
+from sharepoint.copilot_retrieval_provider import CopilotRetrievalProvider
+from sharepoint.sharepoint_config import load_sharepoint_config
+from sharepoint.sharepoint_source import search_sharepoint
 
 
-SEARCH_TOOL_NAME = "search_organisation_sources"
+SEARCH_TOOL_NAME = "search_aws_documents"
+SHAREPOINT_TOOL_NAME = "search_sharepoint"
 MAX_TOOL_QUERY_CHARACTERS = 2_000
 
-ORGANISATION_TOOL_CONFIG = {
-    "tools": [{
-        "toolSpec": {
-            "name": SEARCH_TOOL_NAME,
-            "description": (
-                "Search approved organisation sources for internal, document-specific, "
-                "policy, procedure, or other organisation-grounded information. Use this "
-                "when an answer should represent the organisation rather than general knowledge."
-            ),
-            "strict": True,
-            "inputSchema": {
-                "json": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "A focused semantic search query for organisation sources.",
-                        }
-                    },
-                    "required": ["query"],
-                    "additionalProperties": False,
-                }
-            },
-        }
-    }]
+AWS_SEARCH_TOOL = {
+    "toolSpec": {
+        "name": SEARCH_TOOL_NAME,
+        "description": (
+            "Search documents uploaded to AskAnyDoc and indexed in the AWS-backed document "
+            "library using Titan embeddings and Aurora PostgreSQL/pgvector. Use this when the "
+            "user names an uploaded document, asks about the AWS-indexed corpus, or needs "
+            "evidence stored by AskAnyDoc. Do not use it for live SharePoint content."
+        ),
+        "strict": True,
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "A focused semantic query for the AWS-indexed document library.",
+                    }
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            }
+        },
+    }
 }
+
+SHAREPOINT_SEARCH_TOOL = {
+    "toolSpec": {
+        "name": SHAREPOINT_TOOL_NAME,
+        "description": (
+            "Search live Microsoft 365 SharePoint content using the signed-in user's delegated "
+            "identity and SharePoint permissions. Use this for current SharePoint policies, "
+            "procedures, Teams or Power Automate documentation, or when the user explicitly "
+            "names SharePoint. Do not use it for documents uploaded to AskAnyDoc's AWS library."
+        ),
+        "strict": True,
+        "inputSchema": {
+            "json": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "A focused natural-language SharePoint search query.",
+                    }
+                },
+                "required": ["query"],
+                "additionalProperties": False,
+            }
+        },
+    }
+}
+
+
+def organisation_tool_config(sharepoint_available: bool) -> dict[str, Any]:
+    """Return only the retrieval capabilities authorised for this request."""
+    tools = [AWS_SEARCH_TOOL]
+    if sharepoint_available:
+        tools.append(SHAREPOINT_SEARCH_TOOL)
+    return {"tools": tools}
+
+
+def sharepoint_tool_available(auth_context: dict[str, str] | None) -> bool:
+    """Require both runtime enablement and validated identity fields."""
+    if not auth_context or not all(
+        auth_context.get(field) for field in ("user_id", "tenant_id", "access_token")
+    ):
+        return False
+    return load_sharepoint_config().enabled
 
 
 def _tool_evidence(chunk: dict[str, Any], number: int) -> dict[str, Any]:
@@ -46,17 +93,22 @@ def _tool_evidence(chunk: dict[str, Any], number: int) -> dict[str, Any]:
         "source_type": chunk["source_type"],
         "location": chunk["location"],
         "text": chunk["chunk_text"],
-        "similarity": round(float(chunk["similarity"]), 4),
+        **(
+            {"similarity": round(float(chunk["similarity"]), 4)}
+            if chunk.get("similarity") is not None else {}
+        ),
     }
 
 
 def execute_organisation_tool(
     tool_use: dict[str, Any],
     evidence_start: int,
+    auth_context: dict[str, str] | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Validate and execute one model-requested organisation tool call."""
     tool_use_id = tool_use.get("toolUseId")
-    if tool_use.get("name") != SEARCH_TOOL_NAME:
+    tool_name = tool_use.get("name")
+    if tool_name not in {SEARCH_TOOL_NAME, SHAREPOINT_TOOL_NAME}:
         return ({
             "toolUseId": tool_use_id,
             "content": [{"text": "Unknown organisation tool."}],
@@ -78,7 +130,49 @@ def execute_organisation_tool(
             "status": "error",
         }, [])
 
-    evidence = retrieve_evidence(query)
+    if tool_name == SHAREPOINT_TOOL_NAME:
+        config = load_sharepoint_config()
+        if not config.enabled:
+            return ({
+                "toolUseId": tool_use_id,
+                "content": [{"text": "SharePoint search is not enabled."}],
+                "status": "error",
+            }, [])
+        if not auth_context:
+            return ({
+                "toolUseId": tool_use_id,
+                "content": [{"text": "SharePoint search requires an authenticated user."}],
+                "status": "error",
+            }, [])
+        provider = (CopilotRetrievalProvider(config) if config.provider == "copilot_retrieval" else GraphSearchProvider(config))
+        sharepoint_evidence = search_sharepoint(
+            provider,
+            query,
+            auth_context,
+            config,
+        )
+        evidence = [
+            {
+                "chunk_text": item.text,
+                "source_name": item.source_name,
+                "source_type": "sharepoint",
+                "source_uri": item.source_uri,
+                "object_key": "",
+                "location": {
+                    "site": item.site,
+                    **(
+                        {"page_number": item.page_number}
+                        if item.page_number is not None else {}
+                    ),
+                },
+                "similarity": None,
+                "classification": item.classification,
+                "modified_at": item.modified_at,
+            }
+            for item in sharepoint_evidence
+        ]
+    else:
+        evidence = retrieve_evidence(query)
     public_evidence = [
         _tool_evidence(chunk, evidence_start + index)
         for index, chunk in enumerate(evidence)
@@ -106,5 +200,8 @@ def citation_from_evidence(chunk: dict[str, Any]) -> dict[str, Any]:
         "source_uri": chunk["source_uri"],
         "object_key": chunk["object_key"],
         "location": chunk["location"],
-        "similarity": round(float(chunk["similarity"]), 4),
+        "similarity": (
+            round(float(chunk["similarity"]), 4)
+            if chunk.get("similarity") is not None else None
+        ),
     }

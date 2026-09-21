@@ -86,6 +86,20 @@ resource "aws_iam_role_policy" "langfuse_secret_access" {
   })
 }
 
+resource "aws_iam_role_policy" "entra_secret_access" {
+  name = "askanydoc-entra-secret-access"
+  role = aws_iam_role.lambda_exec.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "secretsmanager:GetSecretValue"
+      Resource = aws_secretsmanager_secret.entra_api_credential.arn
+    }]
+  })
+}
+
 # Let the answer Lambda read only the shared vector database through Data API.
 resource "aws_iam_role_policy" "answer_vector_database" {
   name = "askanydoc-answer-vector-database"
@@ -131,6 +145,10 @@ resource "null_resource" "install_deps" {
       for file in fileset("${path.module}/../app/shared/askanydoc_rag", "*.py") :
       filesha256("${path.module}/../app/shared/askanydoc_rag/${file}")
     ]))
+    sharepoint_code = sha256(join("", [
+      for file in fileset("${path.module}/../app/sharepoint", "*.py") :
+      filesha256("${path.module}/../app/sharepoint/${file}")
+    ]))
   }
 
   # if (Test-Path ...\build) { Remove-Item -Recurse -Force ...\build } — if a build folder already exists, delete it and everything in it (fresh start).
@@ -138,7 +156,7 @@ resource "null_resource" "install_deps" {
   # copy the answer handler into that same build folder.
 
   provisioner "local-exec" {
-    command     = "if (Test-Path ${path.module}\\build) { Remove-Item -Recurse -Force ${path.module}\\build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\assistant_orchestrator.py,${path.module}\\..\\app\\api\\organisation_tools.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\build; New-Item -ItemType Directory -Force ${path.module}\\build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\build\\askanydoc_rag"
+    command     = "if (Test-Path ${path.module}\\build) { Remove-Item -Recurse -Force ${path.module}\\build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\assistant_orchestrator.py,${path.module}\\..\\app\\api\\organisation_tools.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\build; New-Item -ItemType Directory -Force ${path.module}\\build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\build\\askanydoc_rag; New-Item -ItemType Directory -Force ${path.module}\\build\\sharepoint | Out-Null; Copy-Item ${path.module}\\..\\app\\sharepoint\\*.py ${path.module}\\build\\sharepoint"
     interpreter = ["PowerShell", "-Command"]
   }
 }
@@ -178,10 +196,22 @@ resource "aws_lambda_function" "lambda_function" {
       MAX_RESPONSE_TOKENS          = "2048"
       MAX_TOOL_ROUNDS              = "2"
       MINIMUM_RETRIEVAL_SIMILARITY = "0.35"
-      RETRIEVAL_RESULT_LIMIT       = "5"
-      VECTOR_DATABASE_ARN          = aws_rds_cluster.vector_database.arn
-      VECTOR_DATABASE_NAME         = aws_rds_cluster.vector_database.database_name
-      VECTOR_DATABASE_SECRET_ARN   = aws_rds_cluster.vector_database.master_user_secret[0].secret_arn
+      # SharePoint is an explicit, environment-specific gate. Safe defaults keep it
+      # disabled until Copilot entitlement, identity, and retrieval tests are approved.
+      SHAREPOINT_ENABLED             = tostring(var.sharepoint_enabled)
+      SHAREPOINT_PROVIDER            = var.sharepoint_provider
+      SHAREPOINT_GENERAL_SITE_URL    = var.sharepoint_general_site_url
+      SHAREPOINT_RESTRICTED_SITE_URL = var.sharepoint_restricted_site_url
+      SHAREPOINT_MAX_RESULTS         = tostring(var.sharepoint_max_results)
+      SHAREPOINT_TIMEOUT_SECONDS     = "8"
+      SHAREPOINT_MAX_RETRIES         = "2"
+      ENTRA_TENANT_ID                = var.entra_tenant_id
+      ENTRA_API_CLIENT_ID            = var.entra_api_client_id
+      ENTRA_CREDENTIAL_SECRET_ID     = aws_secretsmanager_secret.entra_api_credential.id
+      RETRIEVAL_RESULT_LIMIT         = "5"
+      VECTOR_DATABASE_ARN            = aws_rds_cluster.vector_database.arn
+      VECTOR_DATABASE_NAME           = aws_rds_cluster.vector_database.database_name
+      VECTOR_DATABASE_SECRET_ARN     = aws_rds_cluster.vector_database.master_user_secret[0].secret_arn
     }
   }
 

@@ -2,11 +2,11 @@
 
 **Project 1 of 3 · Weeks 1–6 · Hybrid AI and RAG assistant on AWS**
 
-## Status: 🔄 In progress — hybrid assistant core working; evaluation remains
+## Status: 🔄 In progress — AWS hybrid core working; permission-aware SharePoint slice gated on identity tests
 
 - Started: 2026-06-13
 - Shipped v1.0: (TBD)
-- Live app: http://askanydoc-site-prod-apse2.s3-website-ap-southeast-2.amazonaws.com
+- Live app: use the current Terraform `cloudfront_url` output. The former S3 website URL is historical; the website bucket is now private behind CloudFront.
 - GitHub repo: https://github.com/Giribishal/askanydoc
 
 ### Verified progress
@@ -28,6 +28,11 @@
 - Claude now acts as the conversational assistant and can request the custom organisation-source search as a controlled Bedrock Converse tool.
 - The browser sends bounded recent history for follow-ups. Responses distinguish conversation, general knowledge, organisation evidence, and missing organisation information.
 - Organisation citations are built from stored provenance only after the application validates Claude's selected evidence numbers.
+- The first Microsoft 365 slice now has Entra/MSAL, an API Gateway JWT boundary, delegated on-behalf-of exchange, SharePoint providers, source routing, and a two-site/two-user test environment in the working tree.
+- Bishal reported 8 general and 4 restricted SharePoint documents uploaded. Permission-isolated retrieval is not yet verified, so SharePoint is not claimed production-ready.
+- Option B—delegated Microsoft Graph Search plus bounded on-demand PDF extraction—is selected for the current test environment because the tenant lacks Copilot Retrieval commercial eligibility. Terraform still defaults SharePoint off in checked-in source; delegated consent, user-isolated retrieval tests, a reviewed plan, and explicit approval are required before any apply.
+- Local source routing now exposes a clearly scoped `search_aws_documents` tool and adds `search_sharepoint` only for an enabled request with validated Microsoft identity. It searches one likely source by default, both only when the request needs both, and allows one bounded different-source fallback. This change is tested but not deployed.
+- Current SharePoint execution authority: `docs/SHAREPOINT_RETRIEVAL_SOURCE_OF_TRUTH.md`. It records Options A/B/C, permissions, current versus deployed state, exact gates, approval boundaries, rollback, and next actions.
 
 ### Week 2 outcome
 
@@ -43,13 +48,19 @@ Prompt-tutorial and assigned-reading status remain personal learning-log follow-
 ### Current verified hybrid boundary
 
 - Direct S3/AWS SDK ingestion and custom pgvector retrieval are working end to end.
-- The public Function URL is retained for the portfolio slice, with exact-site CORS and input limits. Authentication and stronger rate limiting are deferred to an API Gateway/Cognito adapter.
+- A public Function URL still exists for the historical AWS-only demo path. It is not an acceptable SharePoint identity boundary. The working tree/local state now also contain CloudFront/private-S3 frontend delivery and an API Gateway/Entra JWT path; live identity/permission regression remains pending.
 - Retrieval currently uses top-5 cosine similarity with a configurable `0.35` minimum. This threshold must be calibrated with the F5 evaluation set rather than treated as universally optimal.
 - Claude Haiku 4.5 is configuration-selected through the AU inference profile. Model quality, latency, lifecycle, and cost must be evaluated before a company rollout.
 - Recent history is client-supplied and browser-local. Authentication, server-owned sessions, tenant isolation, and source ACL filtering remain mandatory company-deployment gates.
 - Scanned-PDF OCR and additional file formats remain deferred.
 
-The detailed current boundary and staged company-readiness gates are documented in [`docs/hybrid_assistant_architecture.md`](docs/hybrid_assistant_architecture.md).
+The detailed current boundary and staged company-readiness gates are documented in [`docs/hybrid_assistant_architecture.md`](docs/hybrid_assistant_architecture.md). Observed failures, resolutions, and remaining work are tracked in [`docs/ISSUES_AND_RESOLUTIONS.md`](docs/ISSUES_AND_RESOLUTIONS.md); token-efficiency experiments have their own research record in [`docs/research/TOKEN_EFFICIENCY.md`](docs/research/TOKEN_EFFICIENCY.md).
+
+The next permission-aware source slice is specified in [`docs/SHAREPOINT_SOURCE_PLAN.md`](docs/SHAREPOINT_SOURCE_PLAN.md).
+
+Architecture evolution, current official reference links, provider strategy, and the exact AWS approval boundary are recorded in [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md). Current implementation evidence and superseded setup assumptions are recorded in [`docs/SHAREPOINT_IMPLEMENTATION_LOG.md`](docs/SHAREPOINT_IMPLEMENTATION_LOG.md).
+
+The live AWS budget `askanydoc-bedrock-monthly` is USD 25 per month with actual-cost alerts at USD 10, 15, 20, and 25, scoped to Amazon Bedrock plus the deployed Claude Haiku 4.5 Bedrock billing entry. The weekly Sunday report is `askanydoc-bedrock-weekly`. AWS Budgets is delayed cost alerting, not an instantaneous hard spending cap. The matching definition is in `infra/cost_budget.tf`; because the live budget was created in the console, follow the import note in that file before enabling it in Terraform.
 
 ---
 

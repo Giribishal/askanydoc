@@ -5,9 +5,30 @@
 
 import { useState, useRef, useEffect } from 'react'   // state + a page pointer + an after-update hook
 import ReactMarkdown from 'react-markdown'             // safely turn Claude's Markdown into readable HTML
+import { useIsAuthenticated, useMsal } from '@azure/msal-react'
+import { InteractionRequiredAuthError } from '@azure/msal-browser'
+import { apiUrl, authConfigured, loginRequest } from './authConfig.js'
 import './App.css'                                     // the styling for this page
 
+function tokenDiagnostics(accessToken) {
+  try {
+    const segment = accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payload = JSON.parse(atob(segment))
+    return {
+      issuer: payload.iss,
+      audience: payload.aud,
+      scope: payload.scp,
+      version: payload.ver,
+    }
+  } catch {
+    return { token_parse: 'failed' }
+  }
+}
+
 function App() {
+
+  const { instance, accounts } = useMsal()
+  const isAuthenticated = useIsAuthenticated()
 
   // ── the data this page remembers ──
   const [question, setQuestion] = useState("")   // what the user is currently typing
@@ -37,7 +58,7 @@ function App() {
   // ── the function the Ask button runs ──
   // async = this function waits for slow things (the Lambda call takes 2-3 seconds).
   async function askQuestion() {
-    if (!question) return   // do nothing if the box is empty
+    if (!question || !isAuthenticated) return   // SharePoint access requires a signed-in user
 
     const submittedQuestion = question
     const history = messages
@@ -63,16 +84,44 @@ function App() {
     setMessages(prev => [...prev, { role: "user", text: question }])
 
     try {
-      const response = await fetch("https://v7vhq6uuwh4jvrv3qash7faamy0ngslw.lambda-url.ap-southeast-2.on.aws/", {
+      let tokenResponse
+      try {
+        tokenResponse = await instance.acquireTokenSilent({
+          ...loginRequest,
+          account: accounts[0],
+        })
+      } catch (error) {
+        if (error instanceof InteractionRequiredAuthError) {
+          await instance.acquireTokenRedirect(loginRequest)
+          return
+        }
+        throw error
+      }
+      const response = await fetch(apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${tokenResponse.accessToken}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           question: submittedQuestion,
           history: history,
         }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "AskAnyDoc could not answer.")
+      const responseText = await response.text()
+      let data = {}
+      try {
+        data = responseText ? JSON.parse(responseText) : {}
+      } catch {
+        data = { error: responseText }
+      }
+      if (!response.ok) {
+        console.error(`AskAnyDoc request rejected ${JSON.stringify({
+          status: response.status,
+          token: tokenDiagnostics(tokenResponse.accessToken),
+        })}`)
+        throw new Error(data.error || data.message || `AskAnyDoc request failed (${response.status}).`)
+      }
 
       setMessages(prev => [...prev, {
         role: "ai",
@@ -95,6 +144,22 @@ function App() {
   return (
     <div className="app">
       <h1>AskAnyDoc</h1>
+
+      {!authConfigured && (
+        <div className="auth-notice">Microsoft sign-in configuration is missing.</div>
+      )}
+      {authConfigured && !isAuthenticated && (
+        <div className="auth-notice">
+          <p>Sign in with your organisation account to search permission-aware SharePoint sources.</p>
+          <button onClick={() => instance.loginRedirect(loginRequest)}>Sign in with Microsoft</button>
+        </div>
+      )}
+      {isAuthenticated && (
+        <div className="auth-row">
+          <span>Signed in as {accounts[0]?.username}</span>
+          <button onClick={() => instance.logoutRedirect()}>Sign out</button>
+        </div>
+      )}
 
       {/* the conversation area: one bubble per message in the list */}
       <div className="chat">
@@ -134,7 +199,13 @@ function App() {
                 <strong>Sources</strong>
                 <ul>
                   {msg.citations.map((citation, citationIndex) => (
-                    <li key={`${citation.source_uri}-${citationIndex}`}>{citationLabel(citation)}</li>
+                    <li key={`${citation.source_uri}-${citationIndex}`}>
+                      {citation.source_uri ? (
+                        <a href={citation.source_uri} target="_blank" rel="noreferrer">
+                          {citationLabel(citation)}
+                        </a>
+                      ) : citationLabel(citation)}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -161,12 +232,13 @@ function App() {
               askQuestion()        // send instead
             }
           }}
-          placeholder="Ask a question..."
+          placeholder={isAuthenticated ? "Ask a question..." : "Sign in to ask questions"}
+          disabled={!isAuthenticated}
           rows="2"
         />
         {/* onClick points to the function (no () -> run on click, not on load).
             disabled while loading so the user can't double-send. */}
-        <button onClick={askQuestion} disabled={loading}>
+        <button onClick={askQuestion} disabled={loading || !isAuthenticated}>
           Ask
         </button>
       </div>

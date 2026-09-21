@@ -2,3 +2,4 @@
 # requirements.txt records the complete resolved deployment environment.
 boto3==1.43.93
 langfuse==4.15.2
+pypdf==6.17.0

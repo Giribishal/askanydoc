@@ -20,28 +20,33 @@ resource "aws_s3_bucket_website_configuration" "bucket_config" {
   }
 }
 
-# Permit public website access. This applies only to the frontend bucket.
+# Block public access. CloudFront reads through signed Origin Access Control requests.
 resource "aws_s3_bucket_public_access_block" "website_public_access" {
   bucket = aws_s3_bucket.website.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
-# Allow browsers to read the static website files.
+# Allow only this CloudFront distribution to read the frontend files.
 resource "aws_s3_bucket_policy" "bucket_policy" {
   bucket = aws_s3_bucket.website.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "PublicReadGetObject"
+        Sid       = "AllowCloudFrontRead"
         Effect    = "Allow"
-        Principal = "*"
+        Principal = { Service = "cloudfront.amazonaws.com" }
         Action    = "s3:GetObject"
         Resource  = "${aws_s3_bucket.website.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+          }
+        }
       }
     ]
   })

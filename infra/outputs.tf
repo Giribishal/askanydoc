@@ -9,6 +9,14 @@ output "api_url" {
   value = aws_lambda_function_url.lambda_function_url.function_url
 }
 
+output "https_website_url" {
+  value = "https://${aws_cloudfront_distribution.frontend.domain_name}"
+}
+
+output "protected_api_url" {
+  value = "${aws_apigatewayv2_api.protected_chat.api_endpoint}/chat"
+}
+
 output "document_bucket_name" {
   value = aws_s3_bucket.documents.bucket
 }

@@ -1,5 +1,7 @@
 # AskAnyDoc Hybrid Assistant Architecture
 
+> **SharePoint execution authority:** The source-neutral orchestration described here does not select or authorize a Microsoft provider. Follow `SHAREPOINT_RETRIEVAL_SOURCE_OF_TRUTH.md` for the current provider, evidence state, gates, and approval rules.
+
 ## Product contract
 
 AskAnyDoc is a general Claude assistant with controlled access to organisation-owned tools.
@@ -29,7 +31,7 @@ Browser sends current message + bounded recent history
      answer normally        request organisation tool
                                   |
                                   v
-                  search_organisation_sources
+                  search_aws_documents
                      Titan question embedding
                               |
                      Aurora pgvector search
@@ -73,7 +75,7 @@ on the current public client-supplied history.
 New systems should enter through narrow tools, for example:
 
 ```text
-search_organisation_sources(query)
+search_aws_documents(query)
 search_sharepoint(query, site_scope)
 query_business_database(approved_query)
 create_support_ticket(validated_fields)
