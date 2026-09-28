@@ -126,7 +126,7 @@ resource "aws_apigatewayv2_api" "protected_chat" {
 
   cors_configuration {
     allow_origins = ["https://${aws_cloudfront_distribution.frontend.domain_name}"]
-    allow_methods = ["POST", "OPTIONS"]
+    allow_methods = ["GET", "POST", "OPTIONS"]
     allow_headers = ["authorization", "content-type"]
   }
 

@@ -209,3 +209,102 @@ This section supersedes the provider/source mismatch described in the earlier ch
 - An earlier Alex filename-heavy query returned no match in 8.68 s. It is recorded as query-sensitivity evidence, not a permission failure.
 - This proves the core end-to-end AskAnyDoc permission matrix for the tested corpus and questions. It does not prove production readiness, the remaining operational/failure cases, or direct site navigation under each isolated identity.
 - No permissions, Entra consent, AWS resource, Lambda code/configuration, Terraform state, billing, IAM, routing, document, or protected AWS retrieval component changed during this test.
+
+## 2026-09-22 — Read-only Entra audit and remaining boundary checks
+
+- Direct Adele navigation proved General allowed and Restricted denied by SharePoint itself. Bishal accepted the existing Alex permission/retrieval evidence without another redundant direct login.
+- Live Entra inspection proved the single-tenant API exposes enabled `access_as_user`; delegated Microsoft Graph `Files.Read.All`, `Sites.Read.All`, and `User.Read` each show `Granted for y4m7`. The single-tenant frontend has the exact CloudFront SPA redirect and requests `access_as_user` plus `User.Read`. No permission or consent changed.
+- A live generic SharePoint no-match returned the controlled no-match mode with no citations.
+- Added test-only coverage for malicious-document isolation, Graph metadata timeout mapping, bounded throttling retries, and the configured file-byte limit. The current source-tree suite passed 48 tests plus 6 subtests in 1.63 seconds.
+- The explicit AWS-versus-SharePoint comparison failed twice: first `Service Unavailable`, then the controlled generic answer failure. This is retained as measured evidence and is the next defect to diagnose; it was not retried further or misreported as a pass.
+- No production code, AWS resource, Lambda configuration, Terraform state, Entra permission, consent, SharePoint permission, billing policy, IAM, routing, document, or protected AWS retrieval component changed.
+
+## 2026-09-22 — Read-only cross-source failure diagnosis
+
+- CloudWatch question hashes matched both explicit AWS-versus-SharePoint prompts to their exact Lambda invocations.
+- The first request, `1e3327cd-715f-4aaa-a0c3-ee87cbaea03a`, completed successfully inside Lambda with `source_mode=organisation_sources`, five citations, and a 34,219.76 ms duration. The protected endpoint is an API Gateway HTTP API whose integration timeout is capped at 30 seconds, explaining the client-visible `Service Unavailable` even though Lambda later logged completion.
+- The bounded retry, `69dfd28c-a14f-4632-9e5f-f3dc8a40aa7c`, failed after 6,908.22 ms in `_final_payload`. Its model result contained valid evidence citation numbers while declaring a non-`organisation_sources` source mode, triggering `ValueError: Only organisation-sourced answers may include citations.` The Lambda handler then returned the observed controlled generic failure.
+- These are two distinct defects: a synchronous transport-duration mismatch and an uncaught final structured-output consistency error. The comparison remains failed until a reviewed remediation is approved and one bounded live retest passes.
+- This diagnosis was read-only. No production code, AWS resource, Lambda/API configuration, Terraform state, Entra permission, consent, SharePoint permission, billing policy, IAM, routing, document, or protected AWS retrieval component changed.
+
+## 2026-09-22 — Test-first narrow source-attribution recovery
+
+- Bishal chose to retain the first request's 30-second HTTP API timeout as an honest, documented boundary rather than changing topology merely to eliminate every failure.
+- Added a regression test that first reproduced the retry's exact semantic failure: retrieved citation numbers paired with a non-organisation source mode escaped as an uncaught `ValueError`.
+- Changed only the final-response validation path. A source-mode/citation inconsistency after a real organisation search now receives the existing single, tool-disabled finalization attempt with explicit consistency instructions. A failed correction still raises `forced_finalization_failed`.
+- Added a separate fail-closed test proving that an organisation attribution mismatch without an actual search is not retried. Existing invented-citation and unsupported no-search organisation-claim boundaries remain unchanged.
+- Verification: **50 Python tests plus 6 subtests passed in 1.35 seconds**; `compileall` passed for `app/api`; `git diff --check` reported no patch errors.
+- This fix is local only. No Lambda deployment, API Gateway/Lambda configuration change, Terraform action, permission/consent change, billing change, document change, or live retest occurred.
+
+## 2026-09-25 — Root source-classification fix supersedes retry-only proposal
+
+- Bishal correctly challenged the earlier bounded retry as an outer-layer safeguard rather than the root fix. The confirmed contract flaw was that the model selected both citation numbers and the global source label even though the application alone owns and validates the evidence boundary. Partial cross-source evidence could therefore contain a valid citation while using `organisation_not_found` for the missing side of the comparison.
+- Replaced the undeployed source-label retry with deterministic application classification. After a real organisation search, one or more validated citation numbers produce `organisation_sources`; a completed search with no cited evidence produces `organisation_not_found`. The model still writes the answer and selects supporting evidence numbers, but it no longer has final authority over the organisation badge.
+- Added a test-first partial AWS-plus-SharePoint case: AWS evidence is present, SharePoint is no-match, and the model proposes `organisation_not_found` with the AWS citation. The application now returns the partial answer as organisation-sourced with the valid citation and no extra Bedrock call.
+- Added a test proving that a completed search without cited evidence is classified as `organisation_not_found`. The existing no-search organisation-claim test still fails closed, and invented or out-of-range citation numbers remain rejected.
+- Verification: **51 Python tests plus 6 subtests passed in 2.72 seconds**; the API-only suite passed 22 tests; `compileall` passed for `app/api`; `git diff --check` reported no patch errors.
+- This root fix is local only and supersedes the undeployed retry-only proposal above. No Lambda deployment, API Gateway/Lambda configuration change, Terraform action, permission/consent change, billing change, document change, or live retest occurred.
+
+## 2026-09-25 — Reviewed production deployment and AWS regression
+
+- Bishal approved the exact saved production plan after review. Terraform replaced only the local packaging trigger, rebuilt/read the archive, and updated the existing `askanydoc-api` Lambda in place. It did not change IAM, API Gateway, S3, ingestion, Aurora configuration/data, Entra, SharePoint, or billing resources.
+- The Lambda update completed successfully at 2026-09-25 09:57:55 AEST with code SHA-256 `LcHPpnPfDjL7yM7yXKi68t2YqlSZaNLsHXI+/MbyR4A=`.
+- The first AWS SQS regression request, `3397dcf3-51b6-476c-affe-a25fe2724a3a`, returned the controlled 503 after 43.38 client seconds. Its exact CloudWatch trace proves `DatabaseResumingException` while the zero-ACU Aurora writer resumed; Lambda duration was 40,095.76 ms. No speculative code change was made.
+- After the database resumed, the single justified retry passed in 31.35 client seconds with `organisation_sources`, a grounded answer, and the expected `17-lambda-sqs-partial-batch-responses.pdf` page 5 citation.
+- The Aurora first-request behavior is now `R-001` in `MODERNIZATION_RISK_AND_CHANGE_REGISTER.md`. The authenticated SharePoint General and explicit cross-source post-deployment checks remain pending until Adele's interactive Microsoft sign-in is completed.
+
+## 2026-09-25 — Authenticated production proof of the root fix
+
+- Adele signed in to the production CloudFront client as `AdeleV@y4m7.onmicrosoft.com`.
+- A broad General semantic question completed as a safe no-match: request `8ea8b1dc-ea29-4359-9e18-95491a545581`, `organisation_not_found`, zero citations, 20.02 s Lambda duration. This is retained as query-sensitivity evidence.
+- One targeted request then returned HTTP 401 before Lambda while the UI still showed Adele signed in. Browser diagnostics showed the expected tenant issuer, API audience, delegated scope, and token version. Reloading the page/session cleared the condition; no identity or permission setting was changed. The root is unproven and tracked as modernization risk `R-026`.
+- The isolated targeted General retry passed: request `8b9d8629-9a67-464b-9b68-08ffc27d2f59`, `organisation_sources`, three citations to `microsoft-cloud-hybrid-architecture.pdf` pages 4, 1, and 2, 13.94 s Lambda duration, 6,325 input / 451 output tokens.
+- The one explicit AWS-versus-SharePoint comparison returned `Service Unavailable` to the browser but completed successfully inside Lambda: request `f3fb33c0-d173-443d-bf20-6d448f7f2271`, 38.78 s, `organisation_sources`, five citations, 7,556 input / 552 output tokens. The deterministic source-classification defect did not recur; the known 30-second transport boundary remains separate and intentionally unfixed.
+- This completes the bounded production proof requested for the root change. Observability and alert design are next; no additional production mutation is authorized.
+
+## 2026-09-26 — Asynchronous answer contract approved and locally verified
+
+- A fresh cold comparison, request `5fbe7886-113e-44f6-acba-fc702aa03972`, failed after 42.77 seconds with `DatabaseResumingException`. The immediate warmed repeat, request `67423134-94a0-4539-bb94-ed0a6e44cd1c`, completed correctly in 43.55 seconds with `organisation_sources` and five citations, while the browser again received `Service Unavailable`.
+- This confirms two independent reliability boundaries: Aurora scale-to-zero resume latency and the API Gateway HTTP API's fixed 30-second integration ceiling. It is not an Adele permission failure and does not require changing SharePoint consent or site access.
+- Bishal approved the official AWS asynchronous request-reply approach: authenticated job creation/status routes, a KMS-encrypted SQS queue and DLQ, a dedicated bounded-concurrency worker, and a KMS-encrypted owner-bound DynamoDB result with one-hour application-enforced expiry and TTL cleanup. The existing answer/retrieval core, S3 ingestion, Titan embeddings, Aurora data, pgvector schema/data, OBO flow, and SharePoint permissions remain unchanged.
+- The worker alone receives a 45-second bounded Aurora resume-retry budget. The current synchronous Lambda keeps the existing 14-second default. The frontend polls for up to three minutes and tolerates temporary status `429`/`5xx` responses.
+- Local verification passed: 11 focused asynchronous/retry tests, 55 complete API/SharePoint tests, frontend lint, frontend production build, Terraform formatting/validation, and `git diff --check`. The existing approximately 590 kB bundle warning remains.
+- The final saved Terraform plan is `23 to add, 3 to change, 2 to destroy`. The destroys are the replaced local packaging trigger and the obsolete hashed frontend JavaScript object; no database, document, queue data, SharePoint permission, Entra consent, ingestion resource, S3 document object, Aurora resource, or pgvector data is deleted or replaced.
+- The saved plan is not yet applied. Fresh explicit approval is still required immediately before the production apply. Alerts remain the next package after the client-visible comparison proof.
+
+## 2026-09-26 — First asynchronous apply stopped at account concurrency guardrail
+
+- The exact approved plan partially applied, then AWS rejected `reserved_concurrent_executions = 2` on the new worker because this account must retain at least 10 unreserved Lambda executions. AWS returned `InvalidParameterValueException`; Terraform exited nonzero and did not create the SQS event source mapping.
+- Read-only verification found both new Lambdas active and successful with no reserved concurrency. The API routes, frontend, encrypted queues, DynamoDB table, KMS key, IAM, and log groups were created; the queue had no consumer yet, so the asynchronous path was not declared operational.
+- AWS's current Lambda documentation supports SQS event-source maximum concurrency independently of function reserved concurrency, with a minimum value of 2. The narrow recovery changes the control location: remove function reserved concurrency and set the SQS event source mapping `maximum_concurrency = 2`. This preserves the intended worker cap without consuming the account's protected unreserved pool.
+- A refreshed Terraform plan and fresh approval are required before applying this recovery. No concurrency quota increase, database change, permission change, or rollback was attempted.
+
+## 2026-09-27 — Recovery deployed; transport passed and cold-answer gate failed
+
+- Bishal approved the narrow recovery plan. Terraform applied exactly `2 added, 0 changed, 1 destroyed`: it replaced the newly tainted worker without function reserved concurrency and added the SQS event source mapping with maximum concurrency two.
+- Read-only verification found both Lambdas active and successful, the worker at 180 seconds/512 MB with no reserved concurrency, an enabled batch-size-one event source mapping, KMS-encrypted SQS/DLQ and DynamoDB resources, and a post-apply Terraform plan reporting no changes.
+- Bishal approved one production comparison through Adele's authenticated session. Job `8710fbc1-c644-44bd-9d0d-b40b966e9b46` was created in 235.76 ms and the browser polled beyond 30 seconds for about 90 seconds, proving the asynchronous transport removed the former client-wait boundary.
+- Worker request `73e1a631-0248-5a48-9a92-c5037e1e54a2` ended after 88.40356 seconds with `DatabaseResumingException`. The job reached a controlled `failed` state and the browser displayed the request ID, but no answer or citations were returned.
+- Aurora capacity moved from 0 to 0.5 ACU during the request. The worker's current 45-second per-call resume budget was insufficient for this cold start; this is an R-001 reliability failure, not a SharePoint permission or asynchronous-transport failure.
+- The source queue and DLQ were empty afterward, showing controlled terminal handling rather than a stranded or poison message.
+- Bishal's standing instruction now requires explicit permission before every future change. No further code, infrastructure, production test, or documentation change is authorized by this record.
+
+## 2026-09-28 — Bounded cross-invocation Aurora recovery verified locally
+
+- Bishal explicitly approved the researched recommendation to preserve the working evidence-combination architecture and fix only the remaining `DatabaseResumingException` boundary. No separate answer merger, Step Functions workflow, persistent SharePoint evidence store, database configuration change, or new service was added.
+- Added tests first. The original worker failed the new contract because it had no SQS retry client, no failed-item response, and treated every answer exception as terminal.
+- The worker now claims and records an attempt number, retries only `DatabaseResumingException`, returns only that message through `ReportBatchItemFailures`, releases its DynamoDB lease to `pending`, and changes the message visibility for a bounded 15-second then 30-second delay. Three total attempts are allowed; unrelated failures remain terminal. Completed and failed jobs remove stale retry metadata.
+- Terraform source reduces the worker's in-process database wait from 45 to 15 seconds, adds the queue URL and attempt/delay settings, grants only `sqs:ChangeMessageVisibility` on the answer queue, enables partial-batch reporting, and changes DLQ `maxReceiveCount` from 2 to AWS's currently recommended minimum of 5. The application-level three-attempt cap remains authoritative for this specific recovery.
+- Verification passed: 5 focused worker tests, 35 complete API tests, 22 complete SharePoint tests, Python compilation, Terraform format check, and Terraform validation. The temporary Windows test dependencies live only under ignored `tmp/windows-test-deps` because the historical virtual environments point to a removed Python installation.
+- A read-only targeted Terraform preview reported `1 to add, 5 to change, 1 to destroy`; the add/destroy pair is the local packaging-trigger replacement. Cloud changes are in-place updates to the encrypted answer queue, worker IAM policy, event-source mapping, job API Lambda, and worker Lambda. The job API code is unchanged but shares the rebuilt ZIP. No Aurora configuration/data, AWS ingestion, S3 document, pgvector, SharePoint permission, Entra, API Gateway, CloudFront, frontend, or billing resource is changed.
+- The preview was not saved or applied. No production test ran. Fresh explicit approval remains required before a saved plan/apply, followed by one varied cold cross-source question and inspection of answer, citations, attempts, latency, tokens, and cost.
+
+## 2026-09-28 — Bounded Aurora recovery deployed; cold cross-source answer passed
+
+- Bishal explicitly approved the exact targeted deployment and one varied production comparison. A fresh saved Terraform plan matched the reviewed scope: one local packaging-trigger replacement and five in-place cloud updates to the answer queue, worker IAM policy, SQS event-source mapping, shared-package job API Lambda, and worker Lambda.
+- Terraform applied successfully. Both Lambdas are active with code SHA-256 `31EBxNTHee98Nyhb+Ikv/6pFMvWf4jplV12uYwAeti4=`. The worker exposes the reviewed 15-second in-process wait, three-attempt cap, and 15-second base retry delay; the mapping reports `ReportBatchItemFailures`; queue visibility remains 1,080 seconds; DLQ `maxReceiveCount` is five; and IAM adds only queue-scoped `sqs:ChangeMessageVisibility`.
+- No Aurora configuration/data, ingestion, S3 document, pgvector, SharePoint permission, Entra, API Gateway, CloudFront, frontend, or billing resource changed.
+- The varied question compared disaster-recovery guidance for AWS workloads with Microsoft hybrid-cloud architecture without naming the storage locations. Job `274b655d-f13d-4219-83b2-96f60d8ed3b9`, worker request `c0fc002f-3934-58f2-a30b-631cf07b4976`, returned a browser-visible `organisation_sources` answer with five citations to `13-disaster-recovery-workloads-on-aws.pdf` and three citations to `microsoft-cloud-hybrid-architecture.pdf`.
+- CloudWatch capacity data proves Aurora was at 0 ACU before the request and resumed during the test. The job completed on attempt one in 47 wall-clock seconds. The worker ran for 44.43388 seconds, billed 47.021 seconds, used at most 170 MB, and recorded 7,723 input / 741 output tokens. Because resume succeeded within the first attempt, the slower 15/30-second cross-invocation branch was not needed live; its success and terminal-cap behavior remain covered by the five focused worker tests.
+- At the current published AU Claude Haiku 4.5 rates, the answer tokens cost about USD $0.01257; Sydney Lambda worker compute was about $0.00039. The measured major subtotal is therefore about $0.013, before negligible embedding, SQS, DynamoDB, KMS, logging, Graph, and short Aurora-capacity charges.
+- The answer gate passed. Work now stops for Bishal's review. Observability and alerts are the next planned package, but require a separate scope, exact plan, cost/rollback review, and fresh explicit approval.

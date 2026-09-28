@@ -17,6 +17,10 @@ output "protected_api_url" {
   value = "${aws_apigatewayv2_api.protected_chat.api_endpoint}/chat"
 }
 
+output "answer_jobs_api_url" {
+  value = "${aws_apigatewayv2_api.protected_chat.api_endpoint}/jobs"
+}
+
 output "document_bucket_name" {
   value = aws_s3_bucket.documents.bucket
 }

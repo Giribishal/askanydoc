@@ -7,7 +7,8 @@ import { useState, useRef, useEffect } from 'react'   // state + a page pointer 
 import ReactMarkdown from 'react-markdown'             // safely turn Claude's Markdown into readable HTML
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
-import { apiUrl, authConfigured, loginRequest } from './authConfig.js'
+import { answerJobsUrl, authConfigured, loginRequest } from './authConfig.js'
+import Sidebar from './Sidebar.jsx'
 import './App.css'                                     // the styling for this page
 
 function tokenDiagnostics(accessToken) {
@@ -25,6 +26,61 @@ function tokenDiagnostics(accessToken) {
   }
 }
 
+// Citation provenance is created by the backend, so the UI can label a source
+// without trusting model-written answer text or exposing storage details by default.
+function citationSourceSystem(citation) {
+  const sourceType = citation?.source_type?.toLowerCase()
+  const sourceUri = citation?.source_uri?.toLowerCase() || ""
+  if (sourceType === "sharepoint" || sourceUri.includes(".sharepoint.com/")) {
+    return "sharepoint"
+  }
+  if (sourceUri.startsWith("s3://") || citation?.object_key) return "aws"
+  return "other"
+}
+
+function sourceBadgeLabel(message) {
+  if (message.source_mode === "general_knowledge") return "Source: General knowledge"
+  if (message.source_mode === "organisation_not_found") return "No organisation source found"
+  if (message.source_mode === "conversation") return "Conversation"
+  if (message.source_mode !== "organisation_sources") return null
+
+  const sourceSystems = new Set((message.citations || []).map(citationSourceSystem))
+  if (sourceSystems.has("aws") && sourceSystems.has("sharepoint")) {
+    return "Sources: AWS document library + SharePoint"
+  }
+  if (sourceSystems.has("sharepoint")) return "Source: SharePoint"
+  if (sourceSystems.has("aws")) return "Source: AWS document library"
+  return "Source: Organisation documents"
+}
+
+function groupedCitations(citations = []) {
+  const groups = {
+    aws: { label: "AWS document library", citations: [] },
+    sharepoint: { label: "SharePoint", citations: [] },
+    other: { label: "Other organisation sources", citations: [] },
+  }
+  citations.forEach(citation => groups[citationSourceSystem(citation)].citations.push(citation))
+  return Object.values(groups).filter(group => group.citations.length > 0)
+}
+
+function initialSidebarState() {
+  try {
+    return window.localStorage.getItem("askanydoc-sidebar-collapsed") === "true"
+  } catch {
+    return false
+  }
+}
+
+function initialTheme() {
+  try {
+    const savedTheme = window.localStorage.getItem("askanydoc-theme")
+    if (savedTheme === "light" || savedTheme === "dark") return savedTheme
+  } catch {
+    // A blocked preference store should not prevent the interface from loading.
+  }
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+}
+
 function App() {
 
   const { instance, accounts } = useMsal()
@@ -34,6 +90,74 @@ function App() {
   const [question, setQuestion] = useState("")   // what the user is currently typing
   const [messages, setMessages] = useState([])   // the WHOLE conversation (a list)
   const [loading, setLoading] = useState(false)  // true while we wait for the Lambda
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarState)
+  const [theme, setTheme] = useState(initialTheme)
+  const currentChatTitle = messages.find(message => message.role === "user")?.text
+
+  function startNewChat() {
+    setMessages([])
+    setQuestion("")
+  }
+
+  function toggleSidebar() {
+    setSidebarCollapsed(currentValue => {
+      const nextValue = !currentValue
+      try {
+        window.localStorage.setItem("askanydoc-sidebar-collapsed", String(nextValue))
+      } catch {
+        // A blocked preference store should not prevent the sidebar from working now.
+      }
+      return nextValue
+    })
+  }
+
+  function toggleTheme() {
+    setTheme(currentTheme => {
+      const nextTheme = currentTheme === "dark" ? "light" : "dark"
+      try {
+        window.localStorage.setItem("askanydoc-theme", nextTheme)
+      } catch {
+        // The current theme still changes even when browser storage is unavailable.
+      }
+      return nextTheme
+    })
+  }
+
+  async function readJsonResponse(response) {
+    const responseText = await response.text()
+    try {
+      return responseText ? JSON.parse(responseText) : {}
+    } catch {
+      return { error: responseText }
+    }
+  }
+
+  async function waitForAnswerJob(jobId, accessToken) {
+    const startedAt = Date.now()
+    const maximumWaitMilliseconds = 180_000
+    while (Date.now() - startedAt < maximumWaitMilliseconds) {
+      await new Promise(resolve => setTimeout(resolve, 2_000))
+      const response = await fetch(`${answerJobsUrl}/${encodeURIComponent(jobId)}`, {
+        headers: { "Authorization": `Bearer ${accessToken}` },
+      })
+      const data = await readJsonResponse(response)
+      // Polling is safe to retry: it only reads an existing job. A brief API
+      // throttle or service error must not discard an answer still being prepared.
+      if (response.status === 429 || response.status >= 500) continue
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Answer status failed (${response.status}).`)
+      }
+      if (data.status === "completed") return data.result
+      if (data.status === "failed") {
+        const requestSuffix = data.request_id ? ` Request ID: ${data.request_id}` : ""
+        throw new Error(`${data.error || "AskAnyDoc could not complete the answer."}${requestSuffix}`)
+      }
+      if (data.status === "expired") {
+        throw new Error(data.error || "This answer job has expired. Please ask the question again.")
+      }
+    }
+    throw new Error(`The answer is still not ready after three minutes. Job ID: ${jobId}`)
+  }
 
   function citationLabel(citation) {
     const location = citation.location || {}
@@ -97,7 +221,7 @@ function App() {
         }
         throw error
       }
-      const response = await fetch(apiUrl, {
+      const response = await fetch(answerJobsUrl, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${tokenResponse.accessToken}`,
@@ -108,13 +232,7 @@ function App() {
           history: history,
         }),
       })
-      const responseText = await response.text()
-      let data = {}
-      try {
-        data = responseText ? JSON.parse(responseText) : {}
-      } catch {
-        data = { error: responseText }
-      }
+      const data = await readJsonResponse(response)
       if (!response.ok) {
         console.error(`AskAnyDoc request rejected ${JSON.stringify({
           status: response.status,
@@ -123,14 +241,17 @@ function App() {
         throw new Error(data.error || data.message || `AskAnyDoc request failed (${response.status}).`)
       }
 
+      if (!data.job_id) throw new Error("AskAnyDoc did not return an answer job ID.")
+      const answer = await waitForAnswerJob(data.job_id, tokenResponse.accessToken)
+
       setMessages(prev => [...prev, {
         role: "ai",
-        text: data.answer,
-        source_mode: data.source_mode,
-        retrieval_score: data.retrieval_score,
-        citations: data.citations || [],
-        input_tokens: data.input_tokens,
-        output_tokens: data.output_tokens,
+        text: answer.answer,
+        source_mode: answer.source_mode,
+        retrieval_score: answer.retrieval_score,
+        citations: answer.citations || [],
+        input_tokens: answer.input_tokens,
+        output_tokens: answer.output_tokens,
       }])
       setQuestion("")
     } catch (error) {
@@ -142,8 +263,41 @@ function App() {
 
   // ── what the page looks like, based on the current data ──
   return (
-    <div className="app">
-      <h1>AskAnyDoc</h1>
+    <div className={isAuthenticated
+      ? `app-shell authenticated${sidebarCollapsed ? " sidebar-collapsed" : ""}`
+      : "app-shell"}
+      data-theme={theme}
+    >
+      {isAuthenticated && (
+        <Sidebar
+          account={accounts[0]}
+          collapsed={sidebarCollapsed}
+          currentChatTitle={currentChatTitle}
+          loading={loading}
+          onNewChat={startNewChat}
+          onSignOut={() => instance.logoutRedirect()}
+          onToggle={toggleSidebar}
+        />
+      )}
+
+      <main className="app">
+        <header className="brand-header">
+          <div className="brand-lockup">
+            <img className="brand-mark" src="/askanydoc-mark.png" alt="" />
+            <h1><span>AskAny</span><span className="brand-doc">Doc</span></h1>
+          </div>
+          <p className="brand-tagline">Trusted answers from your organization</p>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+            <span>{theme === "dark" ? "Light" : "Dark"}</span>
+          </button>
+        </header>
 
       {!authConfigured && (
         <div className="auth-notice">Microsoft sign-in configuration is missing.</div>
@@ -154,13 +308,6 @@ function App() {
           <button onClick={() => instance.loginRedirect(loginRequest)}>Sign in with Microsoft</button>
         </div>
       )}
-      {isAuthenticated && (
-        <div className="auth-row">
-          <span>Signed in as {accounts[0]?.username}</span>
-          <button onClick={() => instance.logoutRedirect()}>Sign out</button>
-        </div>
-      )}
-
       {/* the conversation area: one bubble per message in the list */}
       <div className="chat">
         {/* .map = for EACH message, make one bubble.
@@ -168,53 +315,55 @@ function App() {
         {messages.map((msg, index) => (
           // key = a unique label React needs for each item in a mapped list.
           // className picks the style by role: user bubble vs ai bubble (ternary if/else).
-          <div key={index} className={msg.role === "user" ? "bubble user" : "bubble ai"}>
+          <div key={index} className={`${msg.role === "user" ? "bubble user" : "bubble ai"}${msg.error ? " error" : ""}`}>
             {msg.role === "ai" ? (
               // skipHtml keeps model-written HTML as plain text instead of executing it.
               <div className="message-text"><ReactMarkdown skipHtml>{msg.text}</ReactMarkdown></div>
             ) : (
               <p className="message-text">{msg.text}</p>
             )}
-            {msg.source_mode === "organisation_sources" && (
-              <span className="confidence">Organisation sources</span>
+            {sourceBadgeLabel(msg) && (
+              <span className="source-badge">{sourceBadgeLabel(msg)}</span>
             )}
-            {msg.source_mode === "general_knowledge" && (
-              <span className="confidence">General knowledge</span>
-            )}
-            {msg.source_mode === "organisation_not_found" && (
-              <span className="confidence">Organisation sources: no match</span>
-            )}
-            {/* Retrieval relevance comes from vector search, not model self-confidence. */}
-            {msg.source_mode === "organisation_sources" && (
-              <span className="confidence">Top source match: {msg.retrieval_score}</span>
-            )}
-            {msg.input_tokens > 0 && (
-              <span className="confidence">Input tokens: {msg.input_tokens}</span>
-            )}
-            {msg.output_tokens > 0 && (
-              <span className="confidence">Output tokens: {msg.output_tokens}</span>
-            )}
-            {msg.citations?.length > 0 && (
-              <div className="citations">
-                <strong>Sources</strong>
-                <ul>
-                  {msg.citations.map((citation, citationIndex) => (
-                    <li key={`${citation.source_uri}-${citationIndex}`}>
-                      {citation.source_uri ? (
-                        <a href={citation.source_uri} target="_blank" rel="noreferrer">
-                          {citationLabel(citation)}
-                        </a>
-                      ) : citationLabel(citation)}
-                    </li>
+            {msg.role === "ai" && !msg.error && (
+              <details className="answer-details">
+                <summary>Sources &amp; answer details</summary>
+                <div className="answer-details-content">
+                  {groupedCitations(msg.citations).map(group => (
+                    <div className="citation-group" key={group.label}>
+                      <strong>{group.label}</strong>
+                      <ul>
+                        {group.citations.map((citation, citationIndex) => (
+                          <li key={`${citation.source_uri}-${citationIndex}`}>
+                            {citation.source_uri ? (
+                              <a href={citation.source_uri} target="_blank" rel="noreferrer">
+                                {citationLabel(citation)}
+                              </a>
+                            ) : citationLabel(citation)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
-              </div>
+                  {msg.citations?.length === 0 && (
+                    <p className="detail-note">No document citations were used for this answer.</p>
+                  )}
+                  <div className="answer-metrics">
+                    {/* Only the AWS vector index currently returns a comparable similarity score. */}
+                    {Number.isFinite(msg.retrieval_score) && (
+                      <span>Best AWS semantic match: {msg.retrieval_score}</span>
+                    )}
+                    {msg.input_tokens > 0 && <span>Input tokens: {msg.input_tokens}</span>}
+                    {msg.output_tokens > 0 && <span>Output tokens: {msg.output_tokens}</span>}
+                  </div>
+                </div>
+              </details>
             )}
           </div>
         ))}
 
         {/* show "Thinking..." as a temporary ai-style bubble while waiting */}
-        {loading && <div className="bubble ai"><p>Thinking...</p></div>}
+        {loading && <div className="bubble ai loading"><p>Working on your answer<span aria-hidden="true">…</span></p></div>}
 
         {/* empty marker at the very bottom. bottomRef points here so useEffect can scroll to it. */}
         <div ref={bottomRef}></div>
@@ -222,6 +371,7 @@ function App() {
 
       {/* the input row: textarea + Ask button */}
       <div className="input-row">
+        <span className="composer-icon" aria-hidden="true">✦</span>
         <textarea
           value={question}                                // data -> box
           onChange={(e) => setQuestion(e.target.value)}   // box -> data
@@ -238,10 +388,18 @@ function App() {
         />
         {/* onClick points to the function (no () -> run on click, not on load).
             disabled while loading so the user can't double-send. */}
-        <button onClick={askQuestion} disabled={loading || !isAuthenticated}>
-          Ask
+        <button
+          className="ask-button"
+          onClick={askQuestion}
+          disabled={loading || !isAuthenticated}
+          aria-label="Ask"
+          title="Ask"
+        >
+          <span className="ask-arrow" aria-hidden="true">↑</span>
         </button>
       </div>
+
+      </main>
     </div>
   )
 }

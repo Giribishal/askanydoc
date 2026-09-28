@@ -1,7 +1,7 @@
 # AskAnyDoc SharePoint retrieval — current source of truth
 
-**Effective date:** 2026-09-21
-**Document version:** 1.8
+**Effective date:** 2026-09-28
+**Document version:** 1.18
 **Authority:** This document is the authoritative current execution plan for the SharePoint retrieval slice.
 **Historical records:** Older chats, trackers, ADRs, and implementation logs remain valuable history. If their current recommendation conflicts with this document, follow this document and record any future correction append-only.
 
@@ -25,23 +25,30 @@ copilot_live_proven: false
 copilot_commercial_gate: blocked_no_copilot_addon_and_no_retrieval_payg_policy
 sharepoint_effective_permission_matrix_proven: true
 direct_user_session_permission_matrix_proven: true
-direct_sharepoint_site_access_matrix_proven: false
+direct_sharepoint_site_access_matrix_proven: partial_adele_direct_allow_deny_plus_existing_alex_evidence_accepted_without_repeat
 adele_alex_retrieval_matrix_proven: true
 bishal_authenticated_graph_search_and_pdf_grounding_proven: true
+entra_live_permission_and_consent_audit_proven: true
+generic_live_no_match_proven: true
+malicious_timeout_throttling_extraction_contract_tests_proven: true
+live_cross_source_comparison_status: cold_browser_success_aws_plus_sharepoint_8_citations
+async_answer_architecture_approved: true
+async_answer_local_implementation_status: bounded_database_resume_recovery_deployed_and_cold_cross_source_answer_verified
 aws_retrieval_path_may_be_changed_without_explicit_approval: false
+explicit_permission_required_before_every_change: true
 terraform_apply_authorized: false
 deployment_authorized: false
-last_deployment_approval_recorded_at: 2026-09-21T17:39:49+10:00
+last_deployment_approval_recorded_at: 2026-09-28
 last_deployment_approval_consumed: true
-deployment_status: deployed_option_b_to_askanydoc_api
-deployed_at: 2026-09-21T17:54:44+10:00
-deployed_commit: 4645279
-deployed_lambda_code_sha256: ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=
-next_action: Complete the remaining non-identity matrix cases and read-only Entra consent inspection; keep direct SharePoint site-access verification as a separate Gate 3 item
-last_automated_verification: 86 Python tests passed, 10 skipped, plus 6 subtests passed
-frontend_current_lint_build: passed_with_existing_589_kb_bundle_warning
-terraform_current_validation: passed_with_terraform_1_16_3
-terraform_plan_status: applied_successfully_lambda_in_place_update_only_plus_local_build_trigger_replacement
+deployment_status: async_answer_and_bounded_database_resume_recovery_deployed_cold_cross_source_browser_pass
+deployed_at: 2026-09-28T11:43:40+10:00
+deployed_commit: uncommitted_reviewed_source_tree
+deployed_lambda_code_sha256: 31EBxNTHee98Nyhb+Ikv/6pFMvWf4jplV12uYwAeti4=
+next_action: Stop and review the successful cold cross-source answer gate with Bishal; observability and alerts require a new scoped design, exact plan, and fresh explicit approval
+last_automated_verification: 35_API_tests_and_22_SharePoint_tests_passed; 5_focused_worker_recovery_tests_passed
+frontend_current_lint_build: passed_with_existing_590_kb_bundle_warning
+terraform_current_validation: validate_passed_with_terraform_1_16_3; fmt_check_flags_ignored_live_auth_tfvars_style_only
+terraform_plan_status: targeted_recovery_plan_applied_1_local_trigger_replace_5_in_place_cloud_updates
 ```
 
 ### Mandatory interpretation rules
@@ -51,7 +58,7 @@ terraform_plan_status: applied_successfully_lambda_in_place_update_only_plus_loc
 3. **Option C:** Do not implement it now. It is a future architecture triggered only by measured scale, cost, latency, SLA, or cross-system requirements.
 4. **Current live truth:** Option B is deployed with Graph Search enabled. Bishal's authenticated session proved search, bounded PDF extraction, grounded answering, and SharePoint page citations. Isolated AskAnyDoc sessions now prove Adele can retrieve General but not Restricted evidence, while Alex can retrieve both with correct citations. Copilot Retrieval is not deployed or live-proven.
 5. **AWS protection:** do not modify AWS ingestion, S3, Titan, Aurora, pgvector, AWS retrieval, IAM, state, or data without the exact warning and Bishal's explicit approval immediately before the action.
-6. **Next action only:** the reviewed Option B plan is deployed and the Adele/Alex AskAnyDoc retrieval matrix has passed. Complete the remaining no-match, malformed/malicious-content, throttling, timeout, and read-only Entra-consent evidence. Do not grant consent, change topology, or modify the protected AWS path without a new exact warning and approval.
+6. **Next action only:** the async transport and bounded Aurora-resume recovery are deployed. A varied comparison started with Aurora at 0 ACU and returned a client-visible answer from the AWS disaster-recovery document and the permitted SharePoint hybrid-cloud document, with eight validated citations. The worker completed on its first attempt, so the live request did not need the 15/30-second cross-invocation branch; that slower-resume path remains covered by focused automated tests. Stop and review this gate with Bishal. Observability and alerts are the next planned package, but require a new scoped design, exact plan, and fresh explicit approval.
 7. **Historical text:** statements such as “Graph first” in older logs are history, not current instructions.
 8. **Uncertainty:** when permission, billing, tenant, plan, or blast radius is uncertain, stop before mutation and report the missing evidence.
 9. **Recording:** append evidence to the implementation log and root history; update the current-state sections here only when a verified superseding decision occurs.
@@ -142,7 +149,7 @@ Every SharePoint provider must satisfy all of the following:
 - Both Microsoft providers apply query-time site scoping and post-response URL validation.
 - Post-response validation requires an exact HTTPS host and an exact configured site-path boundary.
 - The Copilot adapter uses `POST https://graph.microsoft.com/v1.0/copilot/retrieval`, `dataSource: sharePoint`, a two-site `path:` filter, title metadata, and bounded results.
-- Automated verification after the Graph download fallback passes: **86 Python tests, 10 intentional skips, plus 6 subtests**. Coverage includes the Option B download fallback and bearer-token boundary as well as Copilot's query limit, malformed JSON, invalid response shape, and retryable network failure mapping.
+- Automated verification after the Graph download fallback passed: **86 Python tests, 10 intentional skips, plus 6 subtests**. On 2026-09-25, the current source-tree suite passed **51 Python tests plus 6 subtests** after adding focused timeout, throttling-cap, extraction-size, malicious-document isolation, deterministic source classification, partial cross-source evidence, and no-search fail-closed tests.
 - The local frontend dependency installation was restored without downloading or replacing tracked source. Frontend lint and the production build pass. The existing approximately 589 kB JavaScript bundle warning remains a performance follow-up, not a correctness failure.
 
 ### 3.2 Applied/deployed evidence
@@ -154,7 +161,7 @@ Every SharePoint provider must satisfy all of the following:
 - Read-only Microsoft 365 admin inspection on 2026-09-21 found only **Microsoft 365 E5 Developer SKU V2** in the license inventory; no Microsoft 365 Copilot add-on license was present.
 - The Copilot Billing & usage page showed no connected billing policy for its listed pay-as-you-go services and did not list Microsoft 365 Copilot Retrieval API as an enabled service.
 - Current Microsoft documentation requires at least one tenant Microsoft 365 Copilot license plus eligible Azure billing for nonlicensed-user Retrieval PAYG. Therefore Option A is commercially blocked in this tenant until eligibility is deliberately obtained or Microsoft changes the requirements.
-- Entra delegated permission/admin-consent status is not live-verified because the Entra portal requested a separate interactive authentication step. Local state confirms a JWT-protected `POST /chat` route with `access_as_user` and configured tenant/client/secret references, but local state is not proof of current Entra consent.
+- Entra delegated permission/admin-consent status was live-verified read-only on 2026-09-22 under the `y4m7` tenant administrator. The single-tenant API registration exposes the enabled `access_as_user` scope. Its delegated Microsoft Graph permissions are `Files.Read.All`, `Sites.Read.All`, and `User.Read`, each showing **Granted for y4m7**. The single-tenant frontend registration has the exact CloudFront SPA redirect URI, requests the API's delegated `access_as_user` scope plus `User.Read`, and has no client credential. No permission or consent was changed.
 - The isolated Adele/Alex AskAnyDoc retrieval matrix passed on 2026-09-21. Alex retrieved both General and Restricted evidence with the expected citations. Adele retrieved the General evidence but received `organisation_not_found`, zero citations, and no Restricted URL or document-derived protection list for the identical Restricted query.
 - Terraform 1.16.3 is checksum-verified in the ignored project `tmp` directory; formatting and validation pass.
 - The recorded deployment approval was consumed by the completed reviewed apply. No further Terraform apply, Lambda deployment, billing enablement, Entra permission grant, state migration, IAM change, database change, or AWS-path change is authorized by this document.
@@ -171,8 +178,15 @@ Every SharePoint provider must satisfy all of the following:
 - The first authenticated SharePoint request found a permitted PDF but failed closed because Graph omitted the optional download annotation. Commit `4645279` added the official `/content` redirect fallback without forwarding the bearer token to storage; 86 tests, 10 intentional skips, and 6 subtests passed.
 - The approved fix deployed successfully at 2026-09-21 07:54:44 UTC with code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=`.
 - Bishal's authenticated retest completed in 13.4 seconds of Lambda duration, returned a grounded architecture answer, and cited pages 1, 2, and 3 of `microsoft-cloud-hybrid-architecture.pdf` from the General site. A subsequent AWS regression again returned the expected SQS PDF/page citation in 33.7 seconds.
-- This proves the Option B vertical slice and user isolation for the tested AskAnyDoc questions. It does not yet prove every remaining failure/operational case or direct navigation to both SharePoint sites under each identity.
+- On 2026-09-25, Bishal approved the exact deterministic source-classification deployment after reviewing a refreshed plan. Terraform changed only the local packaging trigger and updated `askanydoc-api` in place. The deployed code SHA-256 is `LcHPpnPfDjL7yM7yXKi68t2YqlSZaNLsHXI+/MbyR4A=` and AWS reports `Active` / `LastUpdateStatus=Successful`.
+- The first post-deployment AWS request failed while the zero-ACU Aurora writer resumed (`DatabaseResumingException`, request `3397dcf3-51b6-476c-affe-a25fe2724a3a`, 40.10 s Lambda duration). The one justified retry after resume passed in 31.35 client seconds with the expected SQS page-5 citation. This database-availability risk is tracked as `R-001` in the modernization register; it is not attributed to the source-classification change.
+- Adele's first broad General question completed in 20.02 s as a safe no-match with zero citations. A targeted isolated query for `microsoft-cloud-hybrid-architecture.pdf` then completed in 13.94 s with `organisation_sources`, three citations to pages 4, 1, and 2, and no Restricted evidence.
+- One intermediate protected request returned HTTP 401 before Lambda despite the browser still showing Adele signed in and safe diagnostics showing the expected tenant issuer, API audience, scope, and token version. A page/session refresh cleared it; the next protected request passed. The unproven authorizer/session cause is tracked as `R-026`, to be diagnosed through access logging rather than a speculative identity change.
+- The bounded explicit AWS-versus-SharePoint request `f3fb33c0-d173-443d-bf20-6d448f7f2271` completed successfully inside Lambda in 38.78 s with `organisation_sources`, five citations, 7,556 input tokens, and 552 output tokens. The browser received `Service Unavailable` because the result exceeded the HTTP API boundary. This proves the source-classification root fix in production while preserving the separate transport limitation as `R-002`.
+- This proves the Option B vertical slice and user isolation for the tested AskAnyDoc questions. On 2026-09-22, Adele directly opened the General site and received SharePoint Access Denied for the Restricted site. Bishal accepted the existing Alex evidence without repeating another direct-site login. This does not yet prove every remaining operational case.
 - Keep the current single-Lambda architecture for the present test volume because it is simpler and avoids an extra synchronous invocation and overlapping billed duration. A dedicated SharePoint retrieval Lambda is documented in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md` as a deferred scale/reliability option, not the next mandatory migration. Reopen it only when measured triggers justify the extra topology and IAM.
+- On 2026-09-28, Bishal approved and Terraform applied the bounded recovery plan: one local packaging-trigger replacement and five in-place cloud updates to the encrypted answer queue, worker IAM policy, event-source mapping, shared-package job API Lambda, and worker Lambda. Both Lambdas are active with code SHA-256 `31EBxNTHee98Nyhb+Ikv/6pFMvWf4jplV12uYwAeti4=`; the event-source mapping reports `ReportBatchItemFailures`; queue visibility remains 1,080 seconds; DLQ `maxReceiveCount` is five; and the worker has only the queue-scoped `sqs:ChangeMessageVisibility` addition. No Aurora configuration/data, ingestion, S3 document, pgvector, SharePoint permission, Entra, API Gateway, CloudFront, or frontend resource changed.
+- The approved varied production comparison ran as Adele without naming the storage locations. Job `274b655d-f13d-4219-83b2-96f60d8ed3b9`, worker request `c0fc002f-3934-58f2-a30b-631cf07b4976`, returned a browser-visible `organisation_sources` answer comparing disaster recovery on AWS with Microsoft hybrid-cloud architecture. It cited five pages from `13-disaster-recovery-workloads-on-aws.pdf` and three pages from `microsoft-cloud-hybrid-architecture.pdf`. Aurora was at 0 ACU before the request and resumed during the test. The job completed on attempt one in 47 wall-clock seconds; Lambda duration was 44.43388 seconds, billed duration 47.021 seconds, maximum memory 170 MB, with 7,723 input and 741 output tokens. The slower cross-invocation branch was not needed live and remains locally test-proven. Estimated Claude Haiku 4.5 plus worker compute cost was about USD $0.013, before negligible embedding, queue, table, KMS, logging, Graph, and short Aurora-capacity charges.
 
 ### 3.3 SharePoint test corpus and identities
 
@@ -504,6 +518,7 @@ These examples exclude Copilot licensing, Claude/model calls, AWS, Azure, monito
 | `docs/ARCHITECTURE_DECISIONS.md` | ADR history and approved architecture decisions |
 | `docs/SHAREPOINT_IMPLEMENTATION_LOG.md` | Append-only implementation/evidence evolution |
 | `docs/SHAREPOINT_REFERENCE_TEST_MATRIX.md` | Core retrieval and permission evaluation cases |
+| `docs/MODERNIZATION_RISK_AND_CHANGE_REGISTER.md` | Single current register for risks, known issues, official-architecture gaps, and planned changes |
 | `docs/SHAREPOINT_OPTION_C_CUSTOM_INDEX.md` | Detailed future Option C gate |
 | `PROJECT_HANDOFF.md` | Cross-session current handoff and approval boundaries |
 | `PROGRESS_TRACKER.md` | Current project status and next micro-win |
@@ -773,18 +788,16 @@ Resume in this order:
 
 1. Read this document and the latest `PROJECT_HANDOFF.md` checkpoint.
 2. Treat Bishal's explicit 2026-09-21 selection of Option B as complete and recorded in ADR-008.
-3. Complete Gate 2 read-only Entra permission/admin-consent inspection after Bishal completes the portal's interactive authentication step.
-4. Preserve the completed isolated AskAnyDoc sign-in matrix for Adele and Alex. Direct SharePoint site navigation under each isolated identity remains separately unproven and must not reuse an administrator's SharePoint cookie.
-5. Keep the verified exact site paths unchanged unless SharePoint Details produces a different canonical path.
-6. Preserve the current green local baseline: 86 Python tests passed, 10 intentional skips, plus 6 subtests; frontend lint and frontend production build also pass.
-7. Preserve deployment identity: commit `4645279`, Lambda code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=`, applied 2026-09-21 17:54 AEST.
-8. Treat direct authenticated Graph retrieval and bounded PDF extraction as live-proven through the controlled General/Restricted tests; add a lower-level provider-only probe only if it supplies missing diagnostic evidence.
-9. Preserve the passed Adele/Alex General/Restricted matrix and complete the remaining generic no-match, malicious-content, timeout, throttling, and extraction-limit cases.
-10. Preserve the completed AWS regression evidence and add one explicit cross-source comparison now that both individual sources have passed their core retrieval gates.
-11. Continue recording latency, token, throttling, timeout, extraction-limit, and error evidence; the four identity tests already have Lambda duration/token/citation records.
-12. Compare the other provider only as an explicit evaluation after the selected path has evidence.
-13. Keep the single Lambda while the current bounds and tests meet the workload. Reopen the documented separation only for measured concurrency contention, repeated cross-source blast-radius incidents, independent deployment cadence, package/cold-start pressure, least-privilege audit requirements, or an unmet latency/SLA target. Do not alter the protected AWS path under the completed deployment approval.
-14. Keep Option C deferred until representative scale measurements justify a separate platform project.
+3. Preserve the completed read-only Entra audit: the API Graph permissions show tenant consent, `access_as_user` is enabled, and frontend registration values match the deployed CloudFront client. Do not grant or change consent.
+4. Preserve the completed Adele/Alex AskAnyDoc matrix and Adele's direct General-allow/Restricted-deny evidence. Bishal accepted the existing Alex evidence without another redundant direct-site login.
+5. Preserve the current green source baseline: 51 Python tests plus 6 subtests pass; the prior deployment suite was 86 passed, 10 intentional skips, plus 6 subtests. Frontend lint/build remain green with the existing bundle warning.
+6. Treat the deterministic application-owned classification fix as deployed and live-proven at the Lambda boundary. Retain requests `1e3327cd-715f-4aaa-a0c3-ee87cbaea03a` and `f3fb33c0-d173-443d-bf20-6d448f7f2271` as evidence of the separate 30-second client boundary; do not redesign topology solely to make every long request succeed. Validated citations must continue to determine grounded organisation status; a completed search without cited evidence must determine no-match status; invented citations and organisation claims without a real search must continue to fail closed.
+7. Preserve the successful generic no-match result and local malicious-content, timeout, throttling-cap, and extraction-limit contract tests. Obtain live fault/limit evidence only where it is safe and does not require mutating tenant content or production configuration.
+8. The bounded recovery and cold cross-source answer gate passed on 2026-09-28. Stop and review the recorded answer, citations, attempt count, latency, tokens, and cost with Bishal. Planned-change order 3 may then design observability and alerts without alerting on expected no-match or permission denial, but no alert change is authorized until its scope, cost, plan, and rollback receive fresh explicit approval.
+9. Preserve current deployment identity: reviewed uncommitted source tree, Lambda code SHA-256 `LcHPpnPfDjL7yM7yXKi68t2YqlSZaNLsHXI+/MbyR4A=`, applied 2026-09-25 09:57:55 AEST. Commit `4645279` / code SHA-256 `ZfmED9FKHsVh7dTKhu6NjgW5m66chLiRoNUziDNW+LQ=` remains the previous rollback checkpoint.
+10. Compare the other provider only as an explicit evaluation after the selected path has evidence.
+11. Keep the single Lambda while the current bounds and tests meet the workload. Reopen separation only for measured triggers. Do not alter the protected AWS path under the completed deployment approval.
+12. Keep Option C deferred until representative scale measurements justify a separate platform project.
 
 ## 17. Official references to recheck
 
@@ -799,5 +812,6 @@ Resume in this order:
 - Document-level access control: https://learn.microsoft.com/en-us/azure/search/search-document-level-access-overview
 - Secure multitenant RAG: https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/secure-multitenant-rag
 - Bedrock tool use: https://docs.aws.amazon.com/bedrock/latest/userguide/tool-use.html
+- API Gateway HTTP API quotas (30-second maximum integration timeout): https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html
 
 All licensing, prices, preview/GA status, permissions, quotas, supported formats, and service limits are version-sensitive and must be rechecked from current official sources at the relevant gate.

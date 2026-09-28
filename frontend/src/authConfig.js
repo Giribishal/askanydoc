@@ -6,6 +6,7 @@ const apiScope = import.meta.env.VITE_ENTRA_API_SCOPE
 
 export const authConfigured = Boolean(tenantId && spaClientId && apiScope)
 export const apiUrl = import.meta.env.VITE_API_URL
+export const answerJobsUrl = apiUrl?.replace(/\/chat\/?$/, '/jobs')
 export const loginRequest = { scopes: apiScope ? [apiScope] : [] }
 
 export const msalInstance = new PublicClientApplication({

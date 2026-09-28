@@ -70,6 +70,7 @@ resource "aws_s3_object" "frontend_files" {
     css  = "text/css"
     html = "text/html"
     js   = "application/javascript"
+    png  = "image/png"
     svg  = "image/svg+xml"
   }, try(reverse(split(".", each.value))[0], ""), "application/octet-stream")
   cache_control = can(regex("^assets/", each.value)) ? "public,max-age=31536000,immutable" : "no-cache"

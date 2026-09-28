@@ -375,3 +375,72 @@ def test_graph_download_uses_content_redirect_when_annotation_is_omitted(monkeyp
     assert calls[1][0].full_url.endswith("/drives/drive/items/item/content")
     assert calls[1][0].get_header("Authorization") == "Bearer secret-token"
     assert calls[2][0] == "https://storage.example/content-file"
+
+
+def test_graph_download_maps_metadata_timeout_to_retryable_error(monkeypatch):
+    def timeout(*_args, **_kwargs):
+        raise TimeoutError("metadata request timed out")
+
+    monkeypatch.setattr(urllib.request, "urlopen", timeout)
+
+    with pytest.raises(SharePointError) as captured:
+        _download_drive_item("token", "drive", "item", 100, 8)
+
+    assert captured.value.code == "sharepoint_timeout"
+    assert captured.value.retryable
+
+
+def test_graph_download_rejects_file_above_configured_byte_limit(monkeypatch):
+    calls = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self, *_args):
+            return json.dumps({
+                "size": 101,
+                "@microsoft.graph.downloadUrl": "https://storage.example/file",
+            }).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        calls.append((request, timeout))
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    with pytest.raises(SharePointError) as captured:
+        _download_drive_item("token", "drive", "item", 100, 8)
+
+    assert captured.value.code == "document_too_large"
+    assert not captured.value.retryable
+    assert len(calls) == 1
+
+
+def test_throttled_provider_stops_after_configured_retry_cap(monkeypatch):
+    provider = FakeProvider(
+        error=SharePointError(
+            "sharepoint_throttled",
+            "Microsoft Graph throttled the request",
+            retryable=True,
+        )
+    )
+    config = load_sharepoint_config({
+        "SHAREPOINT_ENABLED": "true",
+        "SHAREPOINT_MAX_RETRIES": "2",
+    })
+    monkeypatch.setattr("sharepoint.sharepoint_source.time.sleep", lambda *_args: None)
+
+    with pytest.raises(SharePointError) as captured:
+        search_sharepoint(
+            provider,
+            "approval flow",
+            {"user_id": "adele", "access_token": "api-token"},
+            config,
+        )
+
+    assert captured.value.code == "sharepoint_throttled"
+    assert len(provider.calls) == 3

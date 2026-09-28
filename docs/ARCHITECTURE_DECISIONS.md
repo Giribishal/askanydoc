@@ -212,5 +212,4 @@ Option A, Microsoft 365 Copilot Retrieval, was the preferred target. Option B re
 - Do not copy the full AWS answer Lambda and do not create a second complete application.
 - The design reduces deployment and dependency blast radius and allows measured concurrency isolation. It adds a small invocation charge and overlapping billed duration for synchronous calls.
 - Complete the current permission/latency baseline before migration. Any new Lambda, IAM, invocation permission, routing change, or deployment requires a fresh exact Terraform plan and explicit approval.
-- Detailed gates and rollback are in `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md`.
-- For the current volume, retain the single Lambda because it is simpler and avoids the extra synchronous invocation and overlapping billed duration. Reopen separation only for measured concurrency contention, blast-radius incidents, independent release ownership, package/cold-start pressure, least-privilege audit requirements, or unmet latency/SLA targets.
+- `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md` retains only the target shape and non-negotiable rules. The single current list of triggers, risks, gates, cost, rollback, acceptance evidence, and implementation order is `MODERNIZATION_RISK_AND_CHANGE_REGISTER.md` (`R-003`, `R-007`, `R-013`, and `R-021`).

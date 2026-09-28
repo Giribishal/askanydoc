@@ -8,8 +8,10 @@ FROM public.ecr.aws/lambda/python:3.13@sha256:8565868e1caeac6b69fc5c75ac2f1509b8
 COPY app/ingestion/runtime/requirements.txt .
 RUN pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
-# Copy the reusable RAG package and ingestion-specific adapters only.
-COPY app/shared/askanydoc_rag "${LAMBDA_TASK_ROOT}/askanydoc_rag"
-COPY app/ingestion/runtime/*.py "${LAMBDA_TASK_ROOT}/"
+#Copy the application code into the image
+#Copy the reusable RAG package and ingestion-specific adapters only.
+
+COPY app/shared/askanydoc_rag "${LAMBDA_TASK_ROOT}/askanydoc_rag"  #Copy the reusable RAG package
+COPY app/ingestion/runtime/*.py "${LAMBDA_TASK_ROOT}/"   # Copy ingestion-specific adapters
 
 CMD ["ingestion_lambda_handler.handler"]

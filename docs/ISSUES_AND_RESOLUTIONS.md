@@ -1,16 +1,10 @@
 # AskAnyDoc issues and resolutions
 
-This is the durable operational record of problems we have actually observed, what caused them, what changed, how the change was verified, and what remains open. Planned work without observed evidence stays in the roadmap rather than being presented as an incident.
+This is the append-only operational history of problems we actually observed, their causes, changes, and verification. The single current list of open risks, known limitations, and planned changes is [`MODERNIZATION_RISK_AND_CHANGE_REGISTER.md`](MODERNIZATION_RISK_AND_CHANGE_REGISTER.md). Do not maintain a second priority list here.
 
-## Current priority register
+## Current register pointer
 
-| Priority | Issue | Status | Next acceptance evidence |
-| --- | --- | --- | --- |
-| 1 | Excessive evidence and input-token cost | Open; research priority | Reduce the 26,226-input-token multi-document baseline while preserving retrieval recall, grounded answer quality, and citation correctness |
-| 2 | Duplicate and version-aware ingestion | Open; deferred | Stable logical document/version identity and measured duplicate behavior |
-| 3 | Sequential Titan embedding throughput | Open; deferred | Ingestion latency/throttling baseline followed by bounded-concurrency comparison |
-| 4 | Failed ingestion is not proactively surfaced | Open; deferred | Document status plus tested CloudWatch/DLQ alert and safe replay path |
-| 5 | Answer validation/orchestration recovery and alerting | Partially resolved | Recovery is deployed; validation metrics, terminal-failure alarm, and owned notification route remain |
+Current priorities and acceptance gates are maintained once in the modernization register: token/evidence cost (`R-015`), document/version identity (`R-016`), embedding throughput (`R-017`), ingestion alert/replay operations (`R-018`), and answer-path observability (`R-005`).
 
 ## Incident 2026-09-19 — intermittent answer failures
 
@@ -40,9 +34,7 @@ The first deployment passed historical `toolUse` and `toolResult` blocks into a 
 
 ### Still unresolved
 
-- The largest multi-document recovery used 26,226 input tokens and 1,239 output tokens.
-- Recovery/validation outcomes do not yet have dedicated CloudWatch metrics and an owned alert route.
-- The frontend still needs a deliberate long-conversation strategy rather than waiting for the 12,000-character history rejection.
+The measured 26,226-input-token case, missing recovery/validation alerts, and long-conversation behavior are tracked without duplication as `R-015`, `R-005`, and `R-023` in the modernization register.
 
 Detailed run evidence is in `../evals/F5_LIVE_CORPUS_EVALUATION_2026-09-19.md`.
 
@@ -54,4 +46,8 @@ Live status: created successfully in AWS on 2026-09-20 as `askanydoc-bedrock-mon
 
 The weekly AWS Budgets Report `askanydoc-bedrock-weekly` was also created successfully. It includes only the new Bedrock budget, runs weekly on Sunday, and has one confirmed owner recipient. AWS charges USD 0.01 per delivered report, so it costs roughly USD 0.04–0.05 per month. This complements threshold alerts; it does not enforce a spending stop.
 
-The matching Terraform budget definition is in `../infra/cost_budget.tf`. Because the live budget was created through the console first, import it into Terraform state before enabling the email variable and applying; otherwise Terraform will attempt to create another budget with the same name. The console-created Budget Report is not currently managed by this Terraform configuration.
+The matching Terraform budget definition is in `../infra/cost_budget.tf`. The live-budget import and console-created Budget Report ownership are part of the infrastructure-state/change-control work tracked by the modernization register; neither is authorized by this historical record.
+
+## Observation 2026-09-25 — transient protected-request 401
+
+One production request was rejected by API Gateway before Lambda while the frontend still showed Adele signed in. Safe browser diagnostics showed the expected issuer, API audience, delegated scope, and token version. A page/session refresh cleared the condition and the next SharePoint request passed. The root is unproven because API access/authorizer outcome logs are not configured. Current risk, evidence needs, and acceptance criteria are maintained as `R-026` in `MODERNIZATION_RISK_AND_CHANGE_REGISTER.md`; no speculative identity or permission change was made.

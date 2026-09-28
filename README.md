@@ -2,7 +2,7 @@
 
 **Project 1 of 3 · Weeks 1–6 · Hybrid AI and RAG assistant on AWS**
 
-## Status: 🔄 In progress — AWS hybrid core working; Option B SharePoint identity matrix passed; operational hardening remains
+## Status: 🔄 In progress — permission-aware AWS + SharePoint answers work end to end; operational hardening remains
 
 - Started: 2026-06-13
 - Shipped v1.0: (TBD)
@@ -33,6 +33,7 @@
 - Option B—delegated Microsoft Graph Search plus bounded on-demand PDF extraction—is selected and deployed for the current test environment because the tenant lacks Copilot Retrieval commercial eligibility. Checked-in Terraform still defaults SharePoint off; the live test environment uses reviewed values. The previous deployment approval is consumed, so every future apply requires a fresh reviewed plan and explicit approval.
 - Live source routing exposes `search_aws_documents` and adds `search_sharepoint` only for an enabled request with validated Microsoft identity. It searches one likely source by default, both only when required, and permits one bounded different-source fallback.
 - Current SharePoint execution authority: `docs/SHAREPOINT_RETRIEVAL_SOURCE_OF_TRUTH.md`. It records Options A/B/C, permissions, current versus deployed state, exact gates, approval boundaries, rollback, and next actions.
+- Read-only Entra inspection confirms the live single-tenant registrations, enabled `access_as_user` scope, exact CloudFront redirect, and tenant-granted delegated Graph permissions. The deterministic source classifier, asynchronous answer contract, and bounded Aurora-resume recovery are deployed. On 2026-09-28, a varied comparison began with Aurora at 0 ACU and returned a browser-visible `organisation_sources` answer in 47 seconds with five citations from `13-disaster-recovery-workloads-on-aws.pdf` and three from `microsoft-cloud-hybrid-architecture.pdf`. The worker completed on attempt one with 7,723 input / 741 output tokens; the slower retry branch remains focused-test proven. The exact configuration, code hash, cost estimate, risks, and rollback boundary are recorded in the SharePoint source of truth, test matrix, implementation log, and modernization register. Observability and alerts are next, after review and fresh approval.
 
 ### Week 2 outcome
 
@@ -54,7 +55,7 @@ Prompt-tutorial and assigned-reading status remain personal learning-log follow-
 - Recent history is client-supplied and browser-local. Authentication, server-owned sessions, tenant isolation, and source ACL filtering remain mandatory company-deployment gates.
 - Scanned-PDF OCR and additional file formats remain deferred.
 
-The detailed current boundary and staged company-readiness gates are documented in [`docs/hybrid_assistant_architecture.md`](docs/hybrid_assistant_architecture.md). Observed failures, resolutions, and remaining work are tracked in [`docs/ISSUES_AND_RESOLUTIONS.md`](docs/ISSUES_AND_RESOLUTIONS.md); token-efficiency experiments have their own research record in [`docs/research/TOKEN_EFFICIENCY.md`](docs/research/TOKEN_EFFICIENCY.md).
+The detailed current boundary and staged company-readiness gates are documented in [`docs/hybrid_assistant_architecture.md`](docs/hybrid_assistant_architecture.md). The single current list of risks, known issues, official-architecture gaps, and planned infrastructure/application changes is [`docs/MODERNIZATION_RISK_AND_CHANGE_REGISTER.md`](docs/MODERNIZATION_RISK_AND_CHANGE_REGISTER.md). Observed incident history remains in [`docs/ISSUES_AND_RESOLUTIONS.md`](docs/ISSUES_AND_RESOLUTIONS.md); token-efficiency experiments have their own research record in [`docs/research/TOKEN_EFFICIENCY.md`](docs/research/TOKEN_EFFICIENCY.md).
 
 The next permission-aware source slice is specified in [`docs/SHAREPOINT_SOURCE_PLAN.md`](docs/SHAREPOINT_SOURCE_PLAN.md).
 
