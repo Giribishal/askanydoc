@@ -2,6 +2,8 @@
 // folders, and memory can later replace the current-session item without changing
 // the main answer surface or authentication boundary.
 
+import { useRef } from 'react'
+
 function accountDisplayName(account) {
   const configuredName = account?.name?.trim()
   if (configuredName) return configuredName
@@ -14,13 +16,75 @@ function accountInitials(displayName) {
   return words.slice(0, 2).map(word => word[0]?.toUpperCase()).join("") || "A"
 }
 
-function Sidebar({ account, collapsed, currentChatTitle, loading, onNewChat, onSignOut, onToggle }) {
+function Sidebar({
+  account,
+  collapsed,
+  currentChatTitle,
+  loading,
+  maxSidebarWidth,
+  minSidebarWidth,
+  onNewChat,
+  onResize,
+  onResizeEnd,
+  onSignOut,
+  onToggle,
+  sidebarWidth,
+}) {
   const displayName = accountDisplayName(account)
   const initials = accountInitials(displayName)
+  const compact = !collapsed && sidebarWidth < 200
+  const resizeState = useRef(null)
+
+  function resizedWidth(clientX) {
+    const resize = resizeState.current
+    if (!resize) return sidebarWidth
+    return Math.min(
+      maxSidebarWidth,
+      Math.max(minSidebarWidth, resize.startWidth + clientX - resize.startX),
+    )
+  }
+
+  function startResize(event) {
+    if (event.button !== 0) return
+    event.preventDefault()
+    resizeState.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: sidebarWidth,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function continueResize(event) {
+    if (resizeState.current?.pointerId !== event.pointerId) return
+    onResize(resizedWidth(event.clientX))
+  }
+
+  function finishResize(event) {
+    if (resizeState.current?.pointerId !== event.pointerId) return
+    const nextWidth = resizedWidth(event.clientX)
+    resizeState.current = null
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    onResizeEnd(nextWidth)
+  }
+
+  function resizeWithKeyboard(event) {
+    const step = event.shiftKey ? 32 : 12
+    let nextWidth
+    if (event.key === "ArrowLeft") nextWidth = sidebarWidth - step
+    if (event.key === "ArrowRight") nextWidth = sidebarWidth + step
+    if (event.key === "Home") nextWidth = minSidebarWidth
+    if (event.key === "End") nextWidth = maxSidebarWidth
+    if (nextWidth === undefined) return
+    event.preventDefault()
+    onResizeEnd(Math.min(maxSidebarWidth, Math.max(minSidebarWidth, nextWidth)))
+  }
 
   return (
     <aside
-      className={collapsed ? "sidebar collapsed" : "sidebar"}
+      className={`sidebar${collapsed ? " collapsed" : ""}${compact ? " compact" : ""}`}
       aria-label="AskAnyDoc navigation"
     >
       <button
@@ -63,18 +127,37 @@ function Sidebar({ account, collapsed, currentChatTitle, loading, onNewChat, onS
         <div className="account-details">
           <strong className="account-name">{displayName}</strong>
           <span className="account-status">Signed in</span>
-          <button className="account-signout" onClick={onSignOut}>
-            <svg
-              className="account-signout-icon"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path d="M10 5H6.8A1.8 1.8 0 0 0 5 6.8v10.4A1.8 1.8 0 0 0 6.8 19H10M14.5 8l4 4-4 4M9 12h9" />
-            </svg>
-            <span>Sign out</span>
-          </button>
         </div>
+        <button className="account-signout" onClick={onSignOut}>
+          <svg
+            className="account-signout-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path d="M10 5H6.8A1.8 1.8 0 0 0 5 6.8v10.4A1.8 1.8 0 0 0 6.8 19H10M14.5 8l4 4-4 4M9 12h9" />
+          </svg>
+          <span>Sign out</span>
+        </button>
       </div>
+
+      {!collapsed && (
+        <div
+          className="sidebar-resize-handle"
+          role="separator"
+          aria-label="Resize chat sidebar"
+          aria-orientation="vertical"
+          aria-valuemin={minSidebarWidth}
+          aria-valuemax={maxSidebarWidth}
+          aria-valuenow={Math.round(sidebarWidth)}
+          tabIndex={0}
+          title="Drag to resize the sidebar"
+          onKeyDown={resizeWithKeyboard}
+          onPointerDown={startResize}
+          onPointerMove={continueResize}
+          onPointerUp={finishResize}
+          onPointerCancel={finishResize}
+        />
+      )}
     </aside>
   )
 }

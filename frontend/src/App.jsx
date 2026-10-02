@@ -71,6 +71,24 @@ function initialSidebarState() {
   }
 }
 
+const DEFAULT_SIDEBAR_WIDTH = 168
+const MIN_SIDEBAR_WIDTH = 160
+const MAX_SIDEBAR_WIDTH = 360
+
+function clampSidebarWidth(width) {
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)))
+}
+
+function initialSidebarWidth() {
+  try {
+    const savedWidth = Number(window.localStorage.getItem("askanydoc-sidebar-width"))
+    if (Number.isFinite(savedWidth)) return clampSidebarWidth(savedWidth)
+  } catch {
+    // A blocked preference store should not prevent the interface from loading.
+  }
+  return DEFAULT_SIDEBAR_WIDTH
+}
+
 function initialTheme() {
   try {
     const savedTheme = window.localStorage.getItem("askanydoc-theme")
@@ -91,6 +109,7 @@ function App() {
   const [messages, setMessages] = useState([])   // the WHOLE conversation (a list)
   const [loading, setLoading] = useState(false)  // true while we wait for the Lambda
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarState)
+  const [sidebarWidth, setSidebarWidth] = useState(initialSidebarWidth)
   const [theme, setTheme] = useState(initialTheme)
   const currentChatTitle = messages.find(message => message.role === "user")?.text
 
@@ -109,6 +128,17 @@ function App() {
       }
       return nextValue
     })
+  }
+
+  function updateSidebarWidth(width, persist = false) {
+    const nextWidth = clampSidebarWidth(width)
+    setSidebarWidth(nextWidth)
+    if (!persist) return
+    try {
+      window.localStorage.setItem("askanydoc-sidebar-width", String(nextWidth))
+    } catch {
+      // The resized sidebar still works even when browser storage is unavailable.
+    }
   }
 
   function toggleTheme() {
@@ -267,6 +297,7 @@ function App() {
       ? `app-shell authenticated${sidebarCollapsed ? " sidebar-collapsed" : ""}`
       : "app-shell"}
       data-theme={theme}
+      style={isAuthenticated ? { "--sidebar-width": `${sidebarWidth}px` } : undefined}
     >
       {isAuthenticated && (
         <Sidebar
@@ -277,6 +308,11 @@ function App() {
           onNewChat={startNewChat}
           onSignOut={() => instance.logoutRedirect()}
           onToggle={toggleSidebar}
+          sidebarWidth={sidebarWidth}
+          minSidebarWidth={MIN_SIDEBAR_WIDTH}
+          maxSidebarWidth={MAX_SIDEBAR_WIDTH}
+          onResize={width => updateSidebarWidth(width)}
+          onResizeEnd={width => updateSidebarWidth(width, true)}
         />
       )}
 
@@ -348,14 +384,21 @@ function App() {
                   {msg.citations?.length === 0 && (
                     <p className="detail-note">No document citations were used for this answer.</p>
                   )}
-                  <div className="answer-metrics">
-                    {/* Only the AWS vector index currently returns a comparable similarity score. */}
-                    {Number.isFinite(msg.retrieval_score) && (
-                      <span>Best AWS semantic match: {msg.retrieval_score}</span>
-                    )}
-                    {msg.input_tokens > 0 && <span>Input tokens: {msg.input_tokens}</span>}
-                    {msg.output_tokens > 0 && <span>Output tokens: {msg.output_tokens}</span>}
-                  </div>
+                  {/* Only the AWS vector index currently returns a comparable similarity score. */}
+                  {Number.isFinite(msg.retrieval_score) && (
+                    <p className="detail-note detail-score">
+                      Best AWS semantic match: {msg.retrieval_score}
+                    </p>
+                  )}
+                </div>
+              </details>
+            )}
+            {msg.role === "ai" && !msg.error && (msg.input_tokens > 0 || msg.output_tokens > 0) && (
+              <details className="answer-details token-details">
+                <summary>Tokens</summary>
+                <div className="answer-details-content token-details-content">
+                  {msg.input_tokens > 0 && <span>Input: {msg.input_tokens}</span>}
+                  {msg.output_tokens > 0 && <span>Output: {msg.output_tokens}</span>}
                 </div>
               </details>
             )}

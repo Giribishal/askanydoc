@@ -67,6 +67,26 @@ def test_router_preserves_aws_and_supports_cross_source():
     assert plan_sources("What is in S3?", True).sources == ("aws",)
     assert plan_sources("Compare S3 with SharePoint", True).sources == ("aws", "sharepoint")
     assert plan_sources("Power Automate approval flow", True).sources == ("sharepoint",)
+    assert plan_sources("What problem do partial batch responses solve in SQS?", True).sources == ("aws",)
+    assert plan_sources("What principles guide Microsoft 365 hybrid-cloud architecture?", True).sources == ("sharepoint",)
+    assert plan_sources(
+        "How do S3 disaster recovery and Microsoft 365 hybrid-cloud design complement each other?",
+        True,
+    ).sources == ("aws", "sharepoint")
+    assert plan_sources("Hello, how are you?", True).sources == ()
+    assert plan_sources("What draws people to this design?", True).sources == ()
+
+
+def test_router_records_source_specific_signals_for_query_planning():
+    plan = plan_sources(
+        "What disaster-recovery strategies protect workloads, and how does hybrid cloud "
+        "connect on-premises systems? Compare them.",
+        True,
+    )
+
+    assert plan.sources == ("aws", "sharepoint")
+    assert plan.aws_signals == ("disaster-recovery",)
+    assert plan.sharepoint_signals == ("hybrid cloud",)
 
 
 def test_graph_search_query_is_scoped_to_both_approved_sites():

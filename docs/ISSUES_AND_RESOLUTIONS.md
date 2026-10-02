@@ -51,3 +51,11 @@ The matching Terraform budget definition is in `../infra/cost_budget.tf`. The li
 ## Observation 2026-09-25 — transient protected-request 401
 
 One production request was rejected by API Gateway before Lambda while the frontend still showed Adele signed in. Safe browser diagnostics showed the expected issuer, API audience, delegated scope, and token version. A page/session refresh cleared the condition and the next SharePoint request passed. The root is unproven because API access/authorizer outcome logs are not configured. Current risk, evidence needs, and acceptance criteria are maintained as `R-026` in `MODERNIZATION_RISK_AND_CHANGE_REGISTER.md`; no speculative identity or permission change was made.
+
+## Observation 2026-09-28 — continuous-session grounding regression
+
+A no-refresh production sequence proved that isolated source access remains healthy inside a continuing session: the AWS-only turn returned four validated citations and the SharePoint-only turn returned three. The next combined turn correctly routed both sources and retrieved five AWS plus one SharePoint evidence item, but final synthesis returned no citation numbers once six history messages were present. The application failed closed as `organisation_not_found`; it did not fabricate an organisation source.
+
+The same combined question had returned six validated citations in a clean session. This isolated history-sensitive synthesis/query quality rather than group membership, SharePoint permission, routing, or adapter availability.
+
+The deployed correction now treats complete questions independently of unrelated earlier chat, supplies only the latest exchange to explicit or short follow-ups, and marks conversation history as context rather than organisation evidence. In an unrefreshed session at the 12-message client limit, the controlled AWS and SharePoint questions returned five and three citations respectively, and the formerly failing comparison returned six citations from both libraries. Deeper follow-up resolution and implicit source inference are intentionally deferred under `R-023` and `R-030` rather than hidden inside this fix.
