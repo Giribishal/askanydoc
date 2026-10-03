@@ -2,7 +2,7 @@
 // folders, and memory can later replace the current-session item without changing
 // the main answer surface or authentication boundary.
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 
 function accountDisplayName(account) {
   const configuredName = account?.name?.trim()
@@ -18,7 +18,7 @@ function accountInitials(displayName) {
 
 function Sidebar({
   account,
-  collapsed,
+  view,
   currentChatTitle,
   loading,
   maxSidebarWidth,
@@ -27,13 +27,23 @@ function Sidebar({
   onResize,
   onResizeEnd,
   onSignOut,
-  onToggle,
+  onConnectSalesforce,
+  onDisconnectSalesforce,
+  salesforceAvailable,
+  salesforceConnected,
+  salesforceOrg,
+  salesforceBusy,
+  salesforceNotice,
+  salesforceAuthorizeUrl,
   sidebarWidth,
 }) {
   const displayName = accountDisplayName(account)
   const initials = accountInitials(displayName)
-  const compact = !collapsed && sidebarWidth < 200
+  const compact = sidebarWidth < 220
+  const narrow = sidebarWidth < 180
   const resizeState = useRef(null)
+  const [connectionDetailsOpen, setConnectionDetailsOpen] = useState(false)
+  const [pendingConnectionAction, setPendingConnectionAction] = useState(null)
 
   function resizedWidth(clientX) {
     const resize = resizeState.current
@@ -84,19 +94,10 @@ function Sidebar({
 
   return (
     <aside
-      className={`sidebar${collapsed ? " collapsed" : ""}${compact ? " compact" : ""}`}
-      aria-label="AskAnyDoc navigation"
+      className={`sidebar ${view}-panel${compact ? " compact" : ""}${narrow ? " narrow" : ""}`}
+      aria-label={view === 'connections' ? 'Connections panel' : 'Chats panel'}
     >
-      <button
-        className="sidebar-toggle"
-        onClick={onToggle}
-        aria-expanded={!collapsed}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        <span aria-hidden="true">{collapsed ? "›" : "‹"}</span>
-      </button>
-
+      {view === 'chats' ? <>
       <button
         className="new-chat-button"
         onClick={onNewChat}
@@ -117,18 +118,63 @@ function Sidebar({
           <p className="sidebar-empty">No current chat</p>
         )}
       </nav>
+      </> : <>
+        <header className="connections-header">
+          <h2>Connections</h2>
+          <p>Choose which services AskAnyDoc can read with your permission.</p>
+        </header>
+      {salesforceAvailable && (
+        <div className="sidebar-connections" aria-label="Connections">
+          <button
+            className="sidebar-connection-button"
+            type="button"
+            onClick={() => setConnectionDetailsOpen(value => !value)}
+            aria-expanded={connectionDetailsOpen}
+            title="Salesforce connection settings"
+          >
+            <span className="connection-symbol" aria-hidden="true">S</span>
+            <span>Salesforce <small>{salesforceConnected ? "Connected" : "Not connected"}</small></span>
+            <span className={`connection-dot${salesforceConnected ? " connected" : ""}`} aria-hidden="true" />
+          </button>
+          {connectionDetailsOpen && (
+            <div className="connection-details">
+              <p><strong>Status</strong> {salesforceConnected ? "Connected" : "Not connected"}</p>
+              {salesforceOrg && <p><strong>Org</strong> {salesforceOrg}</p>}
+              <p><strong>Access</strong> Cases · Read only</p>
+              <p>Your Salesforce account is authorized separately from Microsoft sign-in.</p>
+              {salesforceConnected && !pendingConnectionAction && <div className="connection-actions">
+                <button type="button" disabled={salesforceBusy} onClick={() => setPendingConnectionAction('switch')}>Change account</button>
+                <button type="button" disabled={salesforceBusy} onClick={() => setPendingConnectionAction('disconnect')}>Disconnect</button>
+              </div>}
+              {salesforceConnected && pendingConnectionAction && <div className="connection-confirm">
+                <p>{pendingConnectionAction === 'switch'
+                  ? 'Revoke this account’s access, then sign in to Salesforce again with the account you choose?'
+                  : 'Revoke this account’s Salesforce access to AskAnyDoc?'}</p>
+                <div className="connection-actions">
+                  <button type="button" disabled={salesforceBusy} onClick={() => { onDisconnectSalesforce(pendingConnectionAction === 'switch'); setPendingConnectionAction(null) }}>{pendingConnectionAction === 'switch' ? 'Revoke and change' : 'Disconnect now'}</button>
+                  <button type="button" disabled={salesforceBusy} onClick={() => setPendingConnectionAction(null)}>Cancel</button>
+                </div>
+              </div>}
+              {!salesforceConnected && <button type="button" disabled={salesforceBusy} onClick={() => onConnectSalesforce(false)}>Connect Salesforce</button>}
+              {!salesforceConnected && salesforceAuthorizeUrl && <a className="connection-continue" href={salesforceAuthorizeUrl}>Continue to Salesforce</a>}
+            </div>
+          )}
+          {salesforceNotice && <p className="connection-notice" role="status">{salesforceNotice}</p>}
+        </div>
+      )}
+      </>}
 
       <div
         className="account-card"
         aria-label="Signed-in account"
-        title={collapsed ? `Signed in as ${displayName}` : undefined}
+        title={`Signed in as ${displayName}`}
       >
         <div className="account-avatar" aria-hidden="true">{initials}</div>
         <div className="account-details">
           <strong className="account-name">{displayName}</strong>
           <span className="account-status">Signed in</span>
         </div>
-        <button className="account-signout" onClick={onSignOut}>
+        <button className="account-signout" onClick={onSignOut} aria-label="Sign out" title="Sign out">
           <svg
             className="account-signout-icon"
             viewBox="0 0 24 24"
@@ -140,11 +186,10 @@ function Sidebar({
         </button>
       </div>
 
-      {!collapsed && (
-        <div
+      <div
           className="sidebar-resize-handle"
           role="separator"
-          aria-label="Resize chat sidebar"
+          aria-label="Resize sidebar"
           aria-orientation="vertical"
           aria-valuemin={minSidebarWidth}
           aria-valuemax={maxSidebarWidth}
@@ -157,7 +202,6 @@ function Sidebar({
           onPointerUp={finishResize}
           onPointerCancel={finishResize}
         />
-      )}
     </aside>
   )
 }

@@ -125,27 +125,26 @@ a:focus-visible {
   position: absolute;
   z-index: 2;
   top: 0;
-  right: -5px;
-  width: 10px;
+  right: -7px;
+  width: 14px;
   height: 100%;
   cursor: col-resize;
   touch-action: none;
 }
+.sidebar-resize-handle:focus-visible { outline: none; }
 .sidebar-resize-handle::after {
   content: "";
   position: absolute;
-  top: 12px;
-  right: 4px;
-  bottom: 12px;
-  width: 2px;
+  top: calc(50% - 18px);
+  right: 5px;
+  height: 36px;
+  width: 3px;
   border-radius: 999px;
-  background: transparent;
+  background: var(--border-strong);
   transition: background-color 160ms ease;
 }
 .sidebar-resize-handle:hover::after,
-.sidebar-resize-handle:focus-visible::after {
-  background: var(--border-strong);
-}
+.sidebar-resize-handle:focus-visible::after { background: var(--accent); }
 
 .sidebar-toggle {
   width: 44px;
@@ -229,6 +228,51 @@ a:focus-visible {
   font-size: 0.74rem;
 }
 .sidebar-empty { padding: 8px 5px; }
+
+.sidebar-connections { min-width: 0; }
+.sidebar-connections h2 {
+  margin: 0 5px 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.sidebar-connection-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 43px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  font-weight: 700;
+}
+.sidebar-connection-button:disabled { cursor: default; opacity: 1; }
+.connection-symbol {
+  display: grid;
+  flex: 0 0 26px;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.sidebar-connection-button small { display: block; color: var(--muted); font-size: 0.67rem; font-weight: 500; }
+.connection-dot { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: var(--muted); }
+.connection-dot.connected { background: #1ab479; }
+.connection-notice { overflow-wrap: anywhere; margin: 7px 3px 0; color: var(--muted); font-size: 0.72rem; }
+.connection-details { padding: 8px; color: var(--muted); font-size: 0.72rem; }
+.connection-details p { margin: 0 0 7px; }
+.connection-details button { padding: 7px 9px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-strong); color: var(--text); font-weight: 700; }
+.connection-continue { display: block; margin-top: 8px; color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
+.sidebar.collapsed .sidebar-connections { width: 100%; }
+.sidebar.collapsed .sidebar-connection-button { justify-content: center; padding-inline: 5px; }
+.sidebar.collapsed .connection-dot { position: absolute; margin: 0 0 27px 35px; }
 
 .sidebar.collapsed { align-items: center; padding-inline: 10px; }
 .sidebar.collapsed .sidebar-toggle { align-self: center; }
@@ -426,9 +470,10 @@ h1 {
   min-width: 0;
   overflow: hidden;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 11px;
-  padding: 12px;
+  grid-template-columns: 32px minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
@@ -438,8 +483,8 @@ h1 {
   -webkit-backdrop-filter: blur(16px);
 }
 .account-avatar {
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(90, 236, 193, 0.28);
@@ -480,16 +525,14 @@ h1 {
   transform: translateY(-50%);
 }
 .account-signout {
-  max-width: 100%;
-  min-height: 31px;
-  grid-column: 1 / -1;
-  justify-self: center;
-  margin-top: 0;
+  width: 30px;
+  min-height: 30px;
+  justify-self: end;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 3px 11px;
+  gap: 0;
+  padding: 3px;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
   background: transparent;
@@ -498,6 +541,7 @@ h1 {
   font-weight: 720;
   white-space: nowrap;
 }
+.account-signout span { display: none; }
 .account-signout-icon {
   width: 15px;
   height: 15px;
@@ -511,7 +555,7 @@ h1 {
 .account-signout:hover { background: var(--accent-soft); }
 
 /* The user can resize the desktop sidebar independently of the window. Keep
-   controls readable and contained when the panel is narrower than 200px. */
+   controls readable and contained when the panel is narrower than 220px. */
 @media (min-width: 761px) {
   .sidebar.compact {
     gap: 12px;
@@ -539,14 +583,14 @@ h1 {
   .sidebar.compact .current-chat span { font-size: 0.8rem; }
   .sidebar.compact .sidebar-empty { padding: 7px 4px; font-size: 0.7rem; }
   .sidebar.compact .account-card {
-    grid-template-columns: 36px minmax(0, 1fr);
-    gap: 7px;
-    padding: 9px;
+    grid-template-columns: 30px minmax(0, 1fr) 28px;
+    gap: 6px;
+    padding: 7px;
     border-radius: 14px;
   }
   .sidebar.compact .account-avatar {
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
     font-size: 0.74rem;
   }
   .sidebar.compact .account-name { font-size: 0.8rem; }
@@ -557,10 +601,10 @@ h1 {
   }
   .sidebar.compact .account-status::before { width: 6px; height: 6px; }
   .sidebar.compact .account-signout {
-    width: auto;
+    width: 28px;
     min-height: 28px;
-    gap: 4px;
-    padding: 2px 5px;
+    gap: 0;
+    padding: 2px;
     font-size: 0.7rem;
   }
   .sidebar.compact .account-signout-icon { width: 13px; height: 13px; }
@@ -655,6 +699,10 @@ textarea:disabled { cursor: not-allowed; opacity: 0.7; }
     border-bottom: 1px solid var(--border);
   }
   .sidebar-toggle, .sidebar-navigation, .sidebar-resize-handle { display: none; }
+  .sidebar-connections h2, .sidebar-connections .connection-notice { display: none; }
+  .sidebar-connections { width: auto; }
+  .sidebar-connection-button { width: 42px; min-height: 42px; padding: 5px; }
+  .sidebar-connection-button > span:nth-child(2) { display: none; }
   .new-chat-button, .sidebar.collapsed .new-chat-button {
     width: auto;
     min-height: 42px;
@@ -716,6 +764,96 @@ textarea:disabled { cursor: not-allowed; opacity: 0.7; }
   .brand-lockup { gap: 7px; }
   .brand-mark { width: 32px; height: 32px; }
   h1 { font-size: 1.5rem; }
+}
+
+/* A narrow app rail keeps connectors separate from chat navigation. The
+   adjacent panel can grow to hold more connectors without changing chat. */
+.app-shell.authenticated {
+  grid-template-columns: 56px min(var(--sidebar-width, 196px), 40vw) minmax(0, 1fr);
+}
+.app-shell.authenticated.sidebar-collapsed {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+.app-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 7px;
+  border-right: 1px solid var(--border);
+  background: var(--sidebar-bg);
+}
+.app-rail button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--muted);
+}
+.app-rail button:hover,
+.app-rail button.active {
+  border-color: var(--border);
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+.app-rail svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.app-rail .rail-collapse { margin-top: auto; }
+.connections-panel { gap: 14px; }
+.connections-header h2 { color: var(--text-strong); font-size: 1rem; }
+.connections-header p { margin-top: 5px; color: var(--muted); font-size: 0.72rem; line-height: 1.35; }
+.connections-panel .sidebar-connections { flex: 1; }
+.connections-panel .sidebar-connection-button { min-height: 46px; padding: 6px 8px; font-size: 0.84rem; }
+.connections-panel .connection-symbol { flex-basis: 28px; width: 28px; height: 28px; font-size: 0.83rem; font-weight: 750; }
+.sidebar.compact.connections-panel .connection-symbol { display: none; }
+.connections-panel .connection-details {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  line-height: 1.45;
+}
+.connections-panel .connection-details strong { display: block; color: var(--text-strong); }
+.connection-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.connection-confirm { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.connection-details button:disabled { opacity: 0.6; cursor: wait; }
+.sidebar.narrow .account-status { display: none; }
+
+@media (max-width: 760px) {
+  .app-shell.authenticated {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 52px auto minmax(0, 1fr);
+  }
+  .app-shell.authenticated.sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 52px minmax(0, 1fr);
+  }
+  .app-rail { flex-direction: row; justify-content: flex-start; padding: 5px 10px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .app-rail .rail-collapse { margin-top: 0; margin-left: auto; }
+  .sidebar.connections-panel {
+    height: auto;
+    max-height: min(55vh, 300px);
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+  }
+  .sidebar.connections-panel .sidebar-connections { width: 100%; }
+  .sidebar.connections-panel .sidebar-connection-button { width: 100%; }
+  .sidebar.connections-panel .sidebar-connection-button > span:nth-child(2) { display: block; }
+  .sidebar.connections-panel .account-card { margin-left: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from 'react'   // state + a page pointer 
 import ReactMarkdown from 'react-markdown'             // safely turn Claude's Markdown into readable HTML
 import { useIsAuthenticated, useMsal } from '@azure/msal-react'
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
-import { answerJobsUrl, authConfigured, loginRequest } from './authConfig.js'
+import { answerJobsUrl, salesforceUrl, authConfigured, loginRequest } from './authConfig.js'
 import Sidebar from './Sidebar.jsx'
 import './App.css'                                     // the styling for this page
 
@@ -31,6 +31,7 @@ function tokenDiagnostics(accessToken) {
 function citationSourceSystem(citation) {
   const sourceType = citation?.source_type?.toLowerCase()
   const sourceUri = citation?.source_uri?.toLowerCase() || ""
+  if (sourceType === "salesforce_case") return "salesforce"
   if (sourceType === "sharepoint" || sourceUri.includes(".sharepoint.com/")) {
     return "sharepoint"
   }
@@ -49,6 +50,7 @@ function sourceBadgeLabel(message) {
     return "Sources: AWS document library + SharePoint"
   }
   if (sourceSystems.has("sharepoint")) return "Source: SharePoint"
+  if (sourceSystems.has("salesforce")) return "Source: Salesforce Case"
   if (sourceSystems.has("aws")) return "Source: AWS document library"
   return "Source: Organisation documents"
 }
@@ -57,6 +59,7 @@ function groupedCitations(citations = []) {
   const groups = {
     aws: { label: "AWS document library", citations: [] },
     sharepoint: { label: "SharePoint", citations: [] },
+    salesforce: { label: "Salesforce Cases", citations: [] },
     other: { label: "Other organisation sources", citations: [] },
   }
   citations.forEach(citation => groups[citationSourceSystem(citation)].citations.push(citation))
@@ -71,7 +74,7 @@ function initialSidebarState() {
   }
 }
 
-const DEFAULT_SIDEBAR_WIDTH = 168
+const DEFAULT_SIDEBAR_WIDTH = 196
 const MIN_SIDEBAR_WIDTH = 160
 const MAX_SIDEBAR_WIDTH = 360
 
@@ -81,8 +84,10 @@ function clampSidebarWidth(width) {
 
 function initialSidebarWidth() {
   try {
-    const savedWidth = Number(window.localStorage.getItem("askanydoc-sidebar-width"))
-    if (Number.isFinite(savedWidth)) return clampSidebarWidth(savedWidth)
+    // A new preference key starts this compact layout at its intended width,
+    // rather than carrying over the wider panel's saved setting.
+    const savedWidth = Number(window.localStorage.getItem("askanydoc-sidebar-width-v2"))
+    if (Number.isFinite(savedWidth) && savedWidth >= MIN_SIDEBAR_WIDTH) return clampSidebarWidth(savedWidth)
   } catch {
     // A blocked preference store should not prevent the interface from loading.
   }
@@ -109,13 +114,26 @@ function App() {
   const [messages, setMessages] = useState([])   // the WHOLE conversation (a list)
   const [loading, setLoading] = useState(false)  // true while we wait for the Lambda
   const [sidebarCollapsed, setSidebarCollapsed] = useState(initialSidebarState)
+  const [sidebarView, setSidebarView] = useState('chats')
   const [sidebarWidth, setSidebarWidth] = useState(initialSidebarWidth)
   const [theme, setTheme] = useState(initialTheme)
+  const [salesforceConnected, setSalesforceConnected] = useState(false)
+  const [salesforceOrg, setSalesforceOrg] = useState("")
+  const [salesforceBusy, setSalesforceBusy] = useState(false)
+  const [salesforceNotice, setSalesforceNotice] = useState("")
+  const [salesforceAuthorizeUrl, setSalesforceAuthorizeUrl] = useState("")
+  const callbackStarted = useRef(false)
   const currentChatTitle = messages.find(message => message.role === "user")?.text
 
   function startNewChat() {
     setMessages([])
     setQuestion("")
+    setSidebarView('chats')
+  }
+
+  function openSidebarView(view) {
+    setSidebarView(view)
+    setSidebarCollapsed(false)
   }
 
   function toggleSidebar() {
@@ -135,7 +153,7 @@ function App() {
     setSidebarWidth(nextWidth)
     if (!persist) return
     try {
-      window.localStorage.setItem("askanydoc-sidebar-width", String(nextWidth))
+      window.localStorage.setItem("askanydoc-sidebar-width-v2", String(nextWidth))
     } catch {
       // The resized sidebar still works even when browser storage is unavailable.
     }
@@ -159,6 +177,101 @@ function App() {
       return responseText ? JSON.parse(responseText) : {}
     } catch {
       return { error: responseText }
+    }
+  }
+
+  async function accessToken() {
+    try {
+      return (await instance.acquireTokenSilent({ ...loginRequest, account: accounts[0] })).accessToken
+    } catch (error) {
+      if (error instanceof InteractionRequiredAuthError) {
+        await instance.acquireTokenRedirect(loginRequest)
+        return null
+      }
+      throw error
+    }
+  }
+
+  async function salesforceRequest(path, method = "GET", body) {
+    const token = await accessToken()
+    if (!token) return null
+    const response = await fetch(`${salesforceUrl}${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(body ? { "Content-Type": "application/json" } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const data = await readJsonResponse(response)
+    if (!response.ok) throw new Error(data.error || `Salesforce request failed (${response.status}).`)
+    return data
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated || !salesforceUrl || callbackStarted.current) return
+    callbackStarted.current = true
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get("code")
+    const state = params.get("state")
+    const oauthError = params.get("error")
+    if (code || oauthError) window.history.replaceState({}, "", window.location.pathname)
+    async function finishConnection() {
+      try {
+        if (oauthError) throw new Error("Salesforce authorization was not completed.")
+        if (code && state) {
+          await salesforceRequest("/complete", "POST", { code, state })
+          setSalesforceNotice("Salesforce connected for this AskAnyDoc user.")
+        }
+        const status = await salesforceRequest("/status")
+        setSalesforceConnected(Boolean(status?.connected))
+        setSalesforceOrg(status?.org || "")
+      } catch (error) {
+        setSalesforceNotice(error.message)
+      }
+    }
+    finishConnection()
+  // The callback is handled once per page load, after Microsoft sign-in is available.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
+
+  async function connectSalesforce(forceLogin = false) {
+    setSalesforceAuthorizeUrl("")
+    setSalesforceNotice("Preparing Salesforce authorization…")
+    setSalesforceBusy(true)
+    try {
+      const result = await salesforceRequest("/connect", "POST", forceLogin ? { force_login: true } : undefined)
+      const authorizationUrl = new URL(result?.authorization_url)
+      if (authorizationUrl.origin !== "https://login.salesforce.com" || authorizationUrl.pathname !== "/services/oauth2/authorize") {
+        throw new Error("Salesforce returned an unexpected authorization address.")
+      }
+      setSalesforceAuthorizeUrl(authorizationUrl.href)
+      setSalesforceNotice("Continue to Salesforce to authorize your account.")
+    } catch (error) {
+      setSalesforceNotice(error.message)
+    } finally {
+      setSalesforceBusy(false)
+    }
+  }
+
+  async function disconnectSalesforce(changeAccount = false) {
+    setSalesforceBusy(true)
+    setSalesforceNotice("Revoking this Salesforce connection…")
+    try {
+      const result = await salesforceRequest("/disconnect", "POST")
+      if (!result) return
+      if (result.connected !== false) throw new Error("Salesforce did not confirm disconnection.")
+      setSalesforceConnected(false)
+      setSalesforceOrg("")
+      setSalesforceAuthorizeUrl("")
+      setSalesforceNotice(changeAccount
+        ? "Previous Salesforce access revoked. Choose the account to connect next."
+        : "Salesforce disconnected for this AskAnyDoc user.")
+      if (changeAccount) await connectSalesforce(true)
+    } catch (error) {
+      setSalesforceNotice(error.message)
+    } finally {
+      setSalesforceBusy(false)
     }
   }
 
@@ -238,23 +351,26 @@ function App() {
     setMessages(prev => [...prev, { role: "user", text: question }])
 
     try {
-      let tokenResponse
-      try {
-        tokenResponse = await instance.acquireTokenSilent({
-          ...loginRequest,
-          account: accounts[0],
-        })
-      } catch (error) {
-        if (error instanceof InteractionRequiredAuthError) {
-          await instance.acquireTokenRedirect(loginRequest)
-          return
-        }
-        throw error
+      const token = await accessToken()
+      if (!token) return
+      const isSalesforceCase = /salesforce/i.test(submittedQuestion) && /\b500[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?\b/.test(submittedQuestion)
+      if (isSalesforceCase && !salesforceConnected) {
+        throw new Error("Connect your Salesforce account before asking about a Case.")
+      }
+      if (isSalesforceCase) {
+        const answer = await salesforceRequest("/ask", "POST", { question: submittedQuestion, history })
+        setMessages(prev => [...prev, {
+          role: "ai", text: answer.answer, source_mode: answer.source_mode,
+          retrieval_score: answer.retrieval_score, citations: answer.citations || [],
+          input_tokens: answer.input_tokens, output_tokens: answer.output_tokens,
+        }])
+        setQuestion("")
+        return
       }
       const response = await fetch(answerJobsUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${tokenResponse.accessToken}`,
+          "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -266,13 +382,13 @@ function App() {
       if (!response.ok) {
         console.error(`AskAnyDoc request rejected ${JSON.stringify({
           status: response.status,
-          token: tokenDiagnostics(tokenResponse.accessToken),
+          token: tokenDiagnostics(token),
         })}`)
         throw new Error(data.error || data.message || `AskAnyDoc request failed (${response.status}).`)
       }
 
       if (!data.job_id) throw new Error("AskAnyDoc did not return an answer job ID.")
-      const answer = await waitForAnswerJob(data.job_id, tokenResponse.accessToken)
+      const answer = await waitForAnswerJob(data.job_id, token)
 
       setMessages(prev => [...prev, {
         role: "ai",
@@ -300,19 +416,39 @@ function App() {
       style={isAuthenticated ? { "--sidebar-width": `${sidebarWidth}px` } : undefined}
     >
       {isAuthenticated && (
+        <nav className="app-rail" aria-label="Primary navigation">
+          <button type="button" className={sidebarView === 'chats' && !sidebarCollapsed ? 'active' : ''} onClick={() => openSidebarView('chats')} aria-label="Chats" aria-current={sidebarView === 'chats' && !sidebarCollapsed ? 'page' : undefined} title="Chats">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v11H9l-5 3v-14Z" /><path d="M8 9h8M8 12.5h6" /></svg>
+          </button>
+          {salesforceUrl && <button type="button" className={sidebarView === 'connections' && !sidebarCollapsed ? 'active' : ''} onClick={() => openSidebarView('connections')} aria-label="Connections" aria-current={sidebarView === 'connections' && !sidebarCollapsed ? 'page' : undefined} title="Connections">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v5M16 3v5M6 8h12v4a6 6 0 0 1-6 6v3M9 12h6" /></svg>
+          </button>}
+          <button type="button" className="rail-collapse" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!sidebarCollapsed} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM10 4v16" /></svg>
+          </button>
+        </nav>
+      )}
+      {isAuthenticated && !sidebarCollapsed && (
         <Sidebar
           account={accounts[0]}
-          collapsed={sidebarCollapsed}
+          view={sidebarView}
           currentChatTitle={currentChatTitle}
           loading={loading}
           onNewChat={startNewChat}
           onSignOut={() => instance.logoutRedirect()}
-          onToggle={toggleSidebar}
           sidebarWidth={sidebarWidth}
           minSidebarWidth={MIN_SIDEBAR_WIDTH}
           maxSidebarWidth={MAX_SIDEBAR_WIDTH}
           onResize={width => updateSidebarWidth(width)}
           onResizeEnd={width => updateSidebarWidth(width, true)}
+          salesforceAvailable={Boolean(salesforceUrl)}
+          salesforceConnected={salesforceConnected}
+          salesforceOrg={salesforceOrg}
+          salesforceBusy={salesforceBusy}
+          salesforceNotice={salesforceNotice}
+          salesforceAuthorizeUrl={salesforceAuthorizeUrl}
+          onConnectSalesforce={connectSalesforce}
+          onDisconnectSalesforce={disconnectSalesforce}
         />
       )}
 

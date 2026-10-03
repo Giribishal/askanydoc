@@ -127,3 +127,107 @@ For every future entry or status change, record:
 8. rollback;
 9. owner and review date;
 10. approval record when mutation is required.
+
+
+## 8. Observability and alerts design draft — 2026-10-02
+
+**Status:** design only; not approved for implementation or deployment. This section owns the design under planned-change order 5; it is not a second risk register. Recipient selection is pending. Bishal is the proposed operational owner; notification address must be explicitly selected and supplied outside Git.
+
+### User need and smallest scope
+
+Know when AskAnyDoc fails to deliver an answer or ingestion stops, and have enough safe evidence to identify the failure stage. First use existing structured application logs and built-in AWS metrics rather than changing the retrieval pipeline or installing an observability framework. Keep Langfuse for detailed AI trace review.
+
+**Observed gap:** `answer_job_worker.py` catches terminal exceptions, updates the job to failed, logs `answer_job_failed`, and returns a successful Lambda handler result. Native Lambda Errors alone therefore cannot measure answer failures. `answer_job_retry_scheduling_failed` is another terminal path and must be included. Native Errors remains necessary for unhandled exceptions/timeouts before or outside that block. The API logs `answer_job_api_failed` for controlled 503s; the legacy answer handler logs `answer_failed`.
+
+### Stage 1 — infrastructure-only candidate
+
+No application-package, retrieval, database, queue, permission or model configuration change is proposed in this first slice. A future reviewed change may add a CloudWatch log group, metric filters, metric alarms, one SNS topic/subscription, one compact dashboard and protected HTTP API stage access-log settings. Existing worker/API log groups are already declared with 30-day retention. The legacy answer and ingestion log-group ownership must be inventoried before managing existing groups; do not create competing Terraform ownership or import incidentally.
+
+| Signal | Source / candidate control | Initial notification policy | Action |
+| --- | --- | --- | --- |
+| Terminal answer failure | JSON filter matching worker `answer_job_failed` OR `answer_job_retry_scheduling_failed`; separate log-group filters for `answer_failed` and `answer_job_api_failed` | Candidate: Sum >= 1 per 5 minutes, one breaching period; notify owner. These are low-volume demo counts, not a validated production SLO. | Find job/request and failure stage; separate database exhaustion, provider failure, validation failure and infrastructure failure. |
+| Database-resume retry | Existing `answer_job_database_resume_retry_scheduled` log event | Dashboard/log query only; do not notify for a recoverable retry. Exhaustion is a terminal-failure notification. | Check final job result and attempt count before changing Aurora capacity. |
+| Unhandled/runtime failure | Native AWS/Lambda Errors for API, worker, legacy answer and ingestion, each named function | Candidate: Sum >= 1 in 5 minutes. Group/deduplicate incident response where native and application alarms overlap. | Check timeout, initialization and exception logs. A caught application failure need not appear here. |
+| Failed-event queues | AWS/SQS ApproximateNumberOfMessagesVisible, Maximum, for answer-job and ingestion failed queues | Candidate: >= 1 for one 60-second period. Include queue age on dashboard rather than a redundant notification. | Inspect safe metadata promptly. Answer queue retention is one hour; do not replay or reveal raw encrypted payload/tokens without a separate approved procedure. |
+| Ingestion DLQ delivery failure | AWS/Lambda DeadLetterErrors for ingestion | Candidate: Sum >= 1 in 5 minutes | A failed event may never reach the queue; inspect delivery/permission evidence without changing IAM speculatively. |
+| Answer queue waiting time | AWS/SQS age and visible/in-flight depth | Dashboard first; threshold after baseline. | Distinguish worker failure, two-worker capacity, 15/30-second recovery delay and expected low traffic. |
+| API failures / authorization outcomes | Native HTTP API 5xx/4xx/count and safe stage JSON access logs | Candidate 5xx >= 3 per 5 minutes; 401/403 dashboard only initially. No failure alert on every denied request. | Correlate gateway and integration outcome; avoid assuming a JWT cause from a 401 alone. |
+| Worker duration and throttling | Native Duration Maximum/p95, Throttles and ConcurrentExecutions | Dashboard first. No 8-second threshold: a valid cold comparison took 47 seconds. | Collect baseline; assess proximity to configured 180-second timeout and queue backlog. |
+| No-match and permission denial | Completion events with source_mode/citation count; API denied status | Diagnostic outcomes, excluded from terminal-answer filters | Preserve honest no-match. No-match alone cannot prove permission denial; do not manufacture that classification. |
+
+Metric filters must use exact event names rather than a generic ERROR text match. Use distinct fixed metric names/log-group scopes; avoid request IDs, job IDs, emails, question hashes, document URLs or user/tenant IDs as metric dimensions. Keep identifiers only in access-controlled logs where already permitted. Filters publish only new matching logs after creation, not historical backfill. Missing metric data is `notBreaching` for sparse failure/count alarms; absence of traffic is not proof of health, and the owner must separately verify the monitoring path.
+
+**Privacy-preserving HTTP API access log candidate:** requestId, requestTimeEpoch, routeKey, status, responseLength, integration latency, integration request ID/status and controlled response type using variables explicitly supported by HTTP APIs. Validate fields on the actual JWT authorizer: do not assume a Lambda-authorizer error field provides JWT rejection detail. Omit bearer tokens, claims, principal/email, source IP, raw URL/query string, headers, request/response bodies and exception text. Existing legacy error_message/traceback logging needs a separate safe-field review; do not copy those fields into notification payloads.
+
+### Stage 2 — measured telemetry gaps, separately approved
+
+Existing successful worker logs do not record end-to-end elapsed time or recovered-attempt count. Provider exceptions and tool results need inspection before asserting that Graph timeouts/throttles are distinguishable in terminal logs. After reviewing samples, propose bounded safe fields for provider stage, fixed error code, attempt outcome, elapsed duration and completion classification. Do not add new metrics for every combination or create a second trace stack. Retain token/citation counts in logs/dashboard queries until a named operational requirement justifies extra billable metrics. A future small code change requires its own exact shared-package scope, tests and approval.
+
+### Threshold evidence and cost gate
+
+Current thresholds are candidates for a low-volume learning workload, not claims derived from a representative traffic baseline. Inspect recent read-only logs/native metrics before finalizing. Use failure counts rather than a 5-percent ratio on a tiny denominator. Keep 401/403, retries, latency and no-match on the dashboard until an actionable baseline and owner runbook exist.
+
+No fixed Sydney price has been verified in this draft. Before approval, inventory exact billable metric series and alarm-metric count, dashboard widgets, log ingest/storage/retention, Logs Insights scan volume, SNS delivery requests and any encryption costs. Calculate monthly cost with current ap-southeast-2 rates, showing gross cost and eligible free-tier separately; existing account credits/free-tier are not assumed. Do not adopt US pricing examples as Sydney rates. No billing or budget resource is changed by this design.
+
+### Runbook, tests, rollback and acceptance
+
+1. Notification includes fixed alarm name, environment, region, safe metric/reason and runbook link; no question/document/token content. Owner checks terminal job status, log request/job correlation and source stage, then records impact and next action. No automatic replay, permission changes, provider switch or Aurora capacity change.
+2. Local filter fixtures cover all terminal events, including retry-scheduling failure; negative fixtures cover successful citations, expected no-match, duplicates and scheduled resume retries. Native runtime errors and DLQ delivery errors receive separate coverage.
+3. Validate HTTP API JSON format/field availability and redaction, sparse-data behavior, dimensions, threshold/statistic and queue names against the installed Terraform provider version at implementation time.
+4. After exact deployment approval, confirm the chosen SNS email subscription and test the notification path using a clearly labelled alarm test. A notification test alone does not prove the event-to-metric filter. Use synthetic nonprivate log fixtures under a separately approved controlled test scope; do not corrupt live SharePoint documents or provoke production failures just to test alarms.
+5. Acceptance: known terminal event produces the intended metric/alarm and reaches the owner; expected no-match, correct denial and resume retry do not trigger terminal-failure notifications; runtime/failed-queue gaps are visible; dashboard permits safe diagnosis; cost and rollback are reviewed.
+6. Rollback only disables/removes this package's alarm actions, filters/dashboard/notification resources and restores previous stage access-log settings through a reviewed plan. Preserve operational logs/evidence; do not delete existing log groups, queues, jobs, database, AWS documents, SharePoint content, or state.
+7. Exact saved Terraform plan must contain only approved observability resources/settings. Any application packaging, IAM, queue, database, routing, auth, source, replacement/deletion, state/import or billing drift stops this package for separate review. No apply is authorized here.
+
+### Primary evidence checked 2026-10-02
+
+- Lambda metric semantics: https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics-types.html
+- Metric-filter constraints/cardinality: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/FilterAndPatternSyntaxForMetricFilters.html
+- HTTP API-specific access-log fields: https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging-variables.html
+- SQS metrics and DLQ semantics: https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-available-cloudwatch-metrics.html
+- Pricing source to resolve region-specific cost: https://aws.amazon.com/cloudwatch/pricing/
+
+AWS documentation pages were fetched on the check date; publication/update dates were not established. No live inventory, regional price quote, alert subscription or deployment was performed. Recipient choice and read-only baseline measurements remain next.
+
+## 9. Live failure diagnosis and official-guidance check - 2026-10-02
+
+Read-only investigation; no production or application changes. The host AWS session was available outside the restricted shell: the earlier NoCredentials observation describes that shell context, not missing deployment credentials. Retrieved worker CloudWatch logs for the test window 04:41-04:51 UTC / 14:41-14:51 AEST.
+
+### Confirmed failure boundary and reproduced mechanism
+
+Both failed synthetic-policy requests (12378eda-f817-5d9e-a352-ede3c1b67437 and a064c4c8-f866-56e0-9821-a7f1c26def49) log AssistantOrchestrationError, failure_stage source_query_planning, error_code source_query_plan_invalid. They failed in 2.61 s and 0.81 s respectively, before a source_plan_completed event. Thus the observed failures were not a Graph search/download failure, API Gateway timeout, or Aurora resume failure.
+
+A direct Bedrock diagnostic reproduced the exact synthetic prompt with the current source-planning system prompt, schema, model, temperature 0 and maxTokens 512, without retrieving any documents. Response: stopReason end_turn; text JSON with sharepoint_query and sharepoint_fallback_query both empty strings; 509 input / 21 output tokens. The source planner explicitly rejects an empty query. The deployed worker code SHA-256 matches the recorded Sep 28 package, model is au.anthropic.claude-haiku-4-5-20251001-v1:0, timeout 180 s, memory 512 MB, update status Successful. The historical worker logs do not include their raw planner fields, so empty strings are directly proven in the reproduction, while the original two calls' precise invalid field contents are not retained.
+
+Root mechanism: explicit SharePoint wording routes a fabrication request into a query-only schema that requires searches and has no valid decline/no-search outcome. The model emits empty strings, schema-valid but semantically invalid under application rules; the application correctly rejects them but turns the outcome into a generic failed job. Preserve validation; never reinterpret every malformed/empty plan as a safety refusal.
+
+Smallest candidate fix (not implemented): extend the planner contract with explicit search versus decline/no-search disposition, bounded fields and a safe user-facing decline path with no fabricated evidence. For search disposition retain nonempty query validation, bounded execution, authorization and citation checks. Independently handle Bedrock stop reasons (refusal/filtering and max-token cases) before JSON parsing. This reproduction completed with end_turn, so adding refusal-stop handling alone would not fix it. Add focused regression tests for this prompt and ordinary valid, malformed, no-match and cross-source plans. No AWS ingestion/retrieval or SharePoint-provider replacement is justified by this evidence.
+
+### Confirmed slow-first-AWS cause
+
+Job 3858adf6-2f72-4a30-80c8-0c78ca00720c began at 04:42:34 UTC and completed at 04:44:34 UTC: approximately 120 seconds across three worker attempts. First two logged answer_job_database_resume_retry_scheduled with delays 15 and 30 seconds; third succeeded with four citations. Deployed askanydoc-vector-database-prod has MinCapacity 0, MaxCapacity 1, SecondsUntilAutoPause 300. This is the existing intentional cost/latency trade-off: auto-paused Aurora resumes on demand, and bounded asynchronous retries worked. Keep the configuration for the learning environment unless Bishal selects a different latency/cost target; raising minimum capacity would require explicit AWS-path approval and a current cost review.
+
+### Comparison-quality finding
+
+Comparison request da703bd7-002a-5b53-806e-58ee391babfd retrieved five AWS and six SharePoint evidence items and completed in 19.17 s with eight citations. No source/transport failure occurred. The observed refusal to provide a complete comparison is a synthesis-quality issue: the final prompt requires directly supporting evidence but does not distinguish supported synthesis of separate documents from inventing an undocumented policy or claim. Candidate narrow instruction: compare supported facts from each source and label inference/limits; do not require a prewritten comparison document. This is an evidence-based prompt explanation, not an observed internal model rationale.
+
+### Current primary guidance checked
+
+- AWS structured outputs: https://docs.aws.amazon.com/bedrock/latest/userguide/structured-output.html - Converse outputConfig.textFormat is supported; minLength/maxLength are not supported schema constraints; application semantic checks remain necessary. Current custom citation numbers are application fields, not Anthropic native citations, so the native-citations incompatibility is not implicated.
+- AWS structured-output best practices: https://aws.amazon.com/blogs/machine-learning/structured-outputs-on-amazon-bedrock-schema-compliant-ai-responses/ - check stopReason and handle refusals/token-limit exceptions. Our reproduced end_turn/empty-fields outcome additionally needs a meaningful planner disposition.
+- Anthropic invalid-output exceptions: https://platform.claude.com/docs/en/build-with-claude/structured-outputs - refusals can override schema and max_tokens can truncate it. Bedrock stop-reason names must be handled using the actual Bedrock API contract, not copied blindly from Anthropic Messages.
+- AWS Data API DatabaseResumingException: https://docs.aws.amazon.com/botocore/latest/reference/services/rds-data/client/exceptions/DatabaseResumingException.html - paused database resumes automatically; documented retry guidance aligns with the existing worker recovery.
+
+Technology disposition for this diagnosis: keep current shared core, delegated Graph extraction and async jobs; update planner outcome/error handling and bounded synthesis instructions in a separately reviewed patch; defer a retrieval-provider/index replacement and defer higher always-on Aurora spend. No official service migration or architecture replacement is required for the reproduced planner bug.
+
+### Section 9 implementation outcome - 2026-10-02
+
+Bishal approved implementation and code-package deployment. Explicit search/decline, bounded stop-reason handling and comparison/partial-evidence instructions are now deployed. Local 52 API/23 SharePoint tests pass; final live no-match, safe decline, arithmetic, AWS-only, SharePoint-only and two both-source requests passed. Both combined answers cite AWS and SharePoint with seven citations each. Intermediate false decline and partial-evidence failures were caught and refined before the final gate; no-match is no longer misreported as fabrication. See the implementation log for request IDs and exact plan/code hashes. Model classification is still probabilistic; broader eval remains open.
+
+Additional build reliability finding: a pinned-dependency install failure interrupted local rebuild; existing live code stayed healthy. Recovery reused verified pre-patch packages with unchanged dependencies, and byte checks show only the orchestrator changed. Current PowerShell provisioners should later be hardened to stop immediately when pip fails, with package-manifest validation and a reproducible local wheel/dependency cache. This follow-up requires a separately reviewed build-only change; it is not implemented here. Protected AWS retrieval, database sleep policy and source permissions remain unchanged. Alerts draft remains undeployed.
+
+### Additional security probes - 2026-10-02
+
+User-requested bounded security checks: three unauthenticated protected endpoints returned 401; admin-identity spoof, credential extraction and forged tool evidence were declined without citations/retrieval; injected user HTML stayed inert (unchanged title, no injected event-handler/image DOM nodes); two direct live Bedrock synthetic document-injection probes answered legitimate evidence and ignored override/delimiter instructions. All 10 checks and request IDs are recorded in the reference test matrix. No new application/deployment changes were made for these probes. Not an exhaustive penetration test or fresh authenticated denied-user audit.
+
+Remaining quality issue: benign requests to summarise quoted attack text or echo security-test HTML were declined. Attack containment passed, but the app should eventually distinguish analysing untrusted instructions from carrying them out using a broader labelled intent evaluation set, preserving fail-closed authorisation and evidence checks. This is a measured refinement need, not a successful security bypass. Do not silently close it or claim arbitrary injection resistance.

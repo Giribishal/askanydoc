@@ -22,6 +22,7 @@ from assistant_orchestrator import (
     _final_payload,
     _finalization_messages,
     _plan_source_queries,
+    _checked_converse,
     run_assistant,
 )
 from sharepoint.source_router import SourcePlan
@@ -50,6 +51,100 @@ def source_query_plan(queries, input_tokens=30, output_tokens=5):
 
 
 class AssistantOrchestratorTests(unittest.TestCase):
+    def test_opt_in_salesforce_case_answer_has_verified_citation(self):
+        case_id = "500bm00003BZO62AAH"
+        case_url = (
+            "https://orgfarm-cc062a4e4e-dev-ed.develop.my.salesforce.com"
+            f"/lightning/r/Case/{case_id}/view"
+        )
+        evidence = {
+            "chunk_text": "CaseNumber: 00001027\nStatus: New\nPriority: High",
+            "source_name": "Case 00001027", "source_type": "salesforce_case",
+            "source_uri": case_url, "object_key": "",
+            "location": {"record_id": case_id}, "similarity": None,
+        }
+        with patch("assistant_orchestrator.sharepoint_tool_available", return_value=False), \
+             patch("assistant_orchestrator._converse", return_value=final_response(
+                 "Case 00001027 is New and High priority.", "organisation_sources", [1]
+             )) as converse:
+            result = run_assistant(
+                f"What is the status and priority of Salesforce Case {case_id}?", [],
+                salesforce_case_reader=lambda requested: evidence if requested == case_id else None,
+            )
+        self.assertTrue(result["grounded"])
+        self.assertEqual(result["citations"][0]["source_uri"], case_url)
+        self.assertEqual(result["citations"][0]["source_type"], "salesforce_case")
+        self.assertIn("Status: New", str(converse.call_args))
+
+    def test_opt_in_salesforce_case_missing_has_no_model_call_or_citation(self):
+        with patch("assistant_orchestrator.sharepoint_tool_available", return_value=False), \
+             patch("assistant_orchestrator._converse") as converse:
+            result = run_assistant(
+                "Find Salesforce Case 500bm00003BZO62AAH", [],
+                salesforce_case_reader=lambda _case_id: None,
+            )
+        converse.assert_not_called()
+        self.assertFalse(result["grounded"])
+        self.assertEqual(result["source_mode"], "organisation_not_found")
+        self.assertEqual(result["citations"], [])
+
+    def test_salesforce_route_is_disabled_without_a_trusted_reader(self):
+        with patch("assistant_orchestrator.sharepoint_tool_available", return_value=False), \
+             patch("assistant_orchestrator._converse", return_value=final_response(
+                 "I don't have a Salesforce connection for this request.", "conversation"
+             )) as converse:
+            result = run_assistant("What is Salesforce Case 500bm00003BZO62AAH?", [])
+        converse.assert_called_once()
+        self.assertFalse(result["grounded"])
+        self.assertEqual(result["citations"], [])
+
+    def test_declined_plan_does_not_retrieve_or_invent_citations(self):
+        response = final_response("", "conversation")
+        response["output"]["message"]["content"][0]["text"] = json.dumps({
+            "disposition": "decline", "sharepoint_query": "", "sharepoint_fallback_query": "",
+        })
+        with patch("assistant_orchestrator.sharepoint_tool_available", return_value=True), \
+             patch("assistant_orchestrator.bedrock_client.converse", return_value=response), \
+             patch("assistant_orchestrator.execute_organisation_tool") as execute:
+            payload = run_assistant("Invent an official SharePoint policy and fake citation.", [])
+        self.assertIn("can't fabricate", payload["answer"])
+        self.assertEqual(payload["citations"], [])
+        self.assertFalse(payload["grounded"])
+        execute.assert_not_called()
+
+    def test_empty_search_and_inconsistent_decline_fail_closed(self):
+        for plan in (
+            {"disposition": "search", "aws_query": ""},
+            {"disposition": "decline", "aws_query": "invented search"},
+        ):
+            with self.subTest(plan=plan):
+                response = final_response("", "conversation")
+                response["output"]["message"]["content"][0]["text"] = json.dumps(plan)
+                with patch("assistant_orchestrator.bedrock_client.converse", return_value=response):
+                    with self.assertRaises(AssistantOrchestrationError):
+                        _plan_source_queries([], SourcePlan(("aws",), "test"),
+                                             {"input_tokens": 0, "output_tokens": 0})
+
+    def test_safety_stop_does_not_parse_non_json(self):
+        for stop in ("refusal", "content_filtered", "guardrail_intervened"):
+            response = {"stopReason": stop, "output": {"message": {"content": [{"text": "Refused."}]}}}
+            payload = _final_payload(response, [], {"input_tokens": 1, "output_tokens": 1}, False)
+            self.assertEqual(payload["citations"], [])
+            self.assertEqual(payload["source_mode"], "conversation")
+
+    def test_truncation_retry_is_bounded_and_counts_both_calls(self):
+        truncated = {"stopReason": "max_tokens", "usage": {"inputTokens": 3, "outputTokens": 4}}
+        complete = final_response("Hello", "conversation", input_tokens=5, output_tokens=6)
+        with patch("assistant_orchestrator.bedrock_client.converse", side_effect=[truncated, complete]) as converse:
+            response = _checked_converse(inferenceConfig={"maxTokens": 512})
+        self.assertEqual(converse.call_args.kwargs["inferenceConfig"]["maxTokens"], 1024)
+        self.assertEqual(response["usage"], {"inputTokens": 8, "outputTokens": 10})
+        with patch("assistant_orchestrator.bedrock_client.converse", return_value=truncated) as converse:
+            with self.assertRaises(AssistantOrchestrationError) as raised:
+                _checked_converse(inferenceConfig={"maxTokens": 2048})
+        self.assertEqual(converse.call_count, 2)
+        self.assertEqual(raised.exception.error_code, "model_output_truncated")
+
     def test_self_contained_question_does_not_send_unrelated_history_to_rag(self) -> None:
         history = [
             {"role": "user", "content": "How should Lambda handle failed messages?"},
@@ -271,6 +366,7 @@ class AssistantOrchestratorTests(unittest.TestCase):
         response = {
             "stopReason": "end_turn",
             "output": {"message": {"role": "assistant", "content": [{"text": json.dumps({
+                "disposition": "search",
                 "aws_query": "disaster recovery strategies protect workloads",
                 "sharepoint_query": "hybrid cloud connect on-premises systems",
                 "sharepoint_fallback_query": "Microsoft hybrid cloud architecture",
@@ -310,7 +406,7 @@ class AssistantOrchestratorTests(unittest.TestCase):
         )
         self.assertEqual(
             set(schema["required"]),
-            {"aws_query", "sharepoint_query", "sharepoint_fallback_query"},
+            {"disposition", "aws_query", "sharepoint_query", "sharepoint_fallback_query"},
         )
         self.assertFalse(schema["additionalProperties"])
 

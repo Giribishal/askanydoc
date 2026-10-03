@@ -43,6 +43,8 @@ infra/lambda.zip
 infra/ingestion_lambda.zip
 infra/answer_jobs_build/
 infra/answer_jobs.zip
+infra/salesforce_web_build/
+infra/salesforce_web.zip
 
 # Week 3 local/generated files
 data/raw/

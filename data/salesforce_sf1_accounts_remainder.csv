@@ -1,0 +1,47 @@
+﻿Account Name,Account Number,Phone,Fax,Website,Account Site,Employees,Annual Revenue,Billing Street,Billing City,Billing State/Province,Billing Zip/Postal Code,Billing Country,Shipping Street,Shipping City,Shipping State/Province,Shipping Zip/Postal Code,Shipping Country,Description
+Cedar Vale Manufacturing,SF1-C-002,+1 202-555-1002,+1 202-555-1102,https://cedar-vale-manufacturing.example.com,Portland operations,57,1100000,102 Example Avenue,Portland,Oregon,97201,United States,202 Sample Road,Portland,Oregon,97201,United States,Fictional manufacturing company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Northstar Clinic Systems,SF1-C-003,+1 202-555-1003,+1 202-555-1103,https://northstar-clinic-systems.example.com,Denver operations,68,1275000,103 Example Avenue,Denver,Colorado,80201,United States,203 Sample Road,Denver,Colorado,80201,United States,Fictional health technology company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Lakeshore Retail Group,SF1-C-004,+1 202-555-1004,+1 202-555-1104,https://lakeshore-retail-group.example.com,Chicago operations,79,1450000,104 Example Avenue,Chicago,Illinois,60601,United States,204 Sample Road,Chicago,Illinois,60601,United States,Fictional retail company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Stonebridge Facilities,SF1-C-005,+1 202-555-1005,+1 202-555-1105,https://stonebridge-facilities.example.com,Austin operations,90,1625000,105 Example Avenue,Austin,Texas,73301,United States,205 Sample Road,Austin,Texas,73301,United States,Fictional facilities company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Juniper Ridge Foods,SF1-C-006,+1 202-555-1006,+1 202-555-1106,https://juniper-ridge-foods.example.com,Boise operations,101,1800000,106 Example Avenue,Boise,Idaho,83701,United States,206 Sample Road,Boise,Idaho,83701,United States,Fictional food distribution company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Bluehaven Utilities,SF1-C-007,+1 202-555-1007,+1 202-555-1107,https://bluehaven-utilities.example.com,Phoenix operations,112,1975000,107 Example Avenue,Phoenix,Arizona,85001,United States,207 Sample Road,Phoenix,Arizona,85001,United States,Fictional utilities company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Elmcrest Education,SF1-C-008,+1 202-555-1008,+1 202-555-1108,https://elmcrest-education.example.com,Boston operations,123,2150000,108 Example Avenue,Boston,Massachusetts,02108,United States,208 Sample Road,Boston,Massachusetts,02108,United States,Fictional education company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Pine Harbor Media,SF1-C-009,+1 202-555-1009,+1 202-555-1109,https://pine-harbor-media.example.com,San Francisco operations,134,2325000,109 Example Avenue,San Francisco,California,94102,United States,209 Sample Road,San Francisco,California,94102,United States,Fictional media company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Summitfield Engineering,SF1-C-010,+1 202-555-1010,+1 202-555-1110,https://summitfield-engineering.example.com,Raleigh operations,145,2500000,110 Example Avenue,Raleigh,North Carolina,27601,United States,210 Sample Road,Raleigh,North Carolina,27601,United States,Fictional engineering company. Main office and shipping location are recorded. Account details are deliberately complete for search testing.
+Wattle Creek Farms,,+1 202-555-1202,,,,,,,,,,,,,,,,
+Fairview Repairs,,,,,,,,,Brisbane,,,,,,,,,
+Highland Packaging,,+1 202-555-1204,,,,,,,,,,,,,,,,Fictional company. Intake record is incomplete; business details are awaiting confirmation.
+Orchid Bay Travel,,,,,,,,,,,,,,,,,,
+Terrace Dental Group,,+1 202-555-1206,,,,,,,Brisbane,,,,,,,,,
+Willowmere Catering,,,,,,,,,,,,,,,,,,
+Beacon Street Fitness,,+1 202-555-1208,,,,,,,,,,,,,,,,Fictional company. Intake record is incomplete; business details are awaiting confirmation.
+Redwood Training,,,,,,,,,Brisbane,,,,,,,,,
+Mosaic Event Services,,+1 202-555-1210,,,,,,,,,,,,,,,,
+copperleaf it,MIX-002,,,,,,,,,,,,,,,,,Fictional company. Contact details were copied from an older intake form and need review.
+NORTH QUAY STORAGE,legacy 03,202 555 1303,+1 202-555-1403,,,,,,,,,,,,,,,Fictional company. Old CRM note says the warehouse is in Brisbane; address has not been checked.
+Westbrook Co.,MIX-004,,,https://mixed-4.example.com,,,,,,,,,,,,,,Fictional company. Service team uses an abbreviated trading name in some tickets.
+westbrook company,legacy 05,202 555 1305,,,,,,,brisbane,,,,,,,,,Fictional company. Contact details were copied from an older intake form and need review.
+Acacia & Sons,MIX-006,,+1 202-555-1406,,,,,,,,,,,,,,,Fictional company. Old CRM note says the warehouse is in Brisbane; address has not been checked.
+Meridian Health  Tech,legacy 07,202 555 1307,,,,,,,,,,,,,,,,Fictional company. Service team uses an abbreviated trading name in some tickets.
+brightpath logistics,MIX-008,,,https://mixed-8.example.com,,,,,,,,,,,,,,Fictional company. Contact details were copied from an older intake form and need review.
+SouthPier-Print,legacy 09,202 555 1309,+1 202-555-1409,,,,,,,,,,,,,,,Fictional company. Old CRM note says the warehouse is in Brisbane; address has not been checked.
+OAKGLEN SUPPORT,MIX-010,,,,,,,,brisbane,,,,,,,,,Fictional company. Service team uses an abbreviated trading name in some tickets.
+Kestrel Electrical,SF1-B-001,+1 202-555-1501,,https://business-01.example.com,,,,,Austin,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Ironbark Civil Works,SF1-B-002,,,https://business-02.example.com,,,,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Maplebrook Pharmacy,SF1-B-003,+1 202-555-1503,+1 202-555-1603,https://business-03.example.com,,41,,,Seattle,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Cloudline Bookkeeping,SF1-B-004,,,https://business-04.example.com,Operations office,,660000,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Sunward Equipment Hire,SF1-B-005,+1 202-555-1505,,https://business-05.example.com,,,,,Denver,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Greystone Legal Support,SF1-B-006,,+1 202-555-1606,https://business-06.example.com,,62,,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Driftwood Furniture,SF1-B-007,+1 202-555-1507,,https://business-07.example.com,,,,,Austin,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Parkland Security,SF1-B-008,,,https://business-08.example.com,Operations office,,920000,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Eucalypt Design Studio,SF1-B-009,+1 202-555-1509,+1 202-555-1609,https://business-09.example.com,,83,,,Seattle,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Amberpoint Labs,SF1-B-010,,,https://business-10.example.com,,,,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Bridgewater Cleaning,SF1-B-011,+1 202-555-1511,,https://business-11.example.com,,,,,Denver,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Dunewell Hardware,SF1-B-012,,+1 202-555-1612,https://business-12.example.com,Operations office,104,1180000,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Foxglove Childcare,SF1-B-013,+1 202-555-1513,,https://business-13.example.com,,,,,Austin,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Northgate Veterinary,SF1-B-014,,,https://business-14.example.com,,,,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Clearwater Landscaping,SF1-B-015,+1 202-555-1515,+1 202-555-1615,https://business-15.example.com,,125,,,Seattle,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Hillcrest Mobility,SF1-B-016,,,https://business-16.example.com,Operations office,,1440000,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Silver Fern Hospitality,SF1-B-017,+1 202-555-1517,,https://business-17.example.com,,,,,Denver,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Riverton Plumbing,SF1-B-018,,+1 202-555-1618,https://business-18.example.com,,146,,,,,,,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.
+Eastbank Community Arts,SF1-B-019,+1 202-555-1519,,https://business-19.example.com,,,,,Austin,,,United States,,,,,,Fictional company. Routine customer profile for account and case retrieval practice.

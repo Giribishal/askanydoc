@@ -1,7 +1,7 @@
 # AskAnyDoc SharePoint retrieval — current source of truth
 
-**Effective date:** 2026-09-28
-**Document version:** 1.24
+**Effective date:** 2026-10-02
+**Document version:** 1.25
 **Authority:** This document is the authoritative current execution plan for the SharePoint retrieval slice.
 **Historical records:** Older chats, trackers, ADRs, and implementation logs remain valuable history. If their current recommendation conflicts with this document, follow this document and record any future correction append-only.
 
@@ -38,14 +38,14 @@ aws_retrieval_path_may_be_changed_without_explicit_approval: false
 explicit_permission_required_before_every_change: true
 terraform_apply_authorized: false
 deployment_authorized: false
-last_deployment_approval_recorded_at: 2026-09-28
+last_deployment_approval_recorded_at: 2026-10-02
 last_deployment_approval_consumed: true
-deployment_status: bounded_conversation_grounding_deployed; explicit_AWS_SharePoint_and_combined_continuous_session_gate_passed
-deployed_at: 2026-09-28T16:32:08+10:00
+deployment_status: explicit_search_or_decline_planner_and_supported_comparison_synthesis_deployed; final_no_match_AWS_SharePoint_and_two_combined_checks_passed
+deployed_at: 2026-10-02
 deployed_commit: uncommitted_reviewed_source_tree
-deployed_lambda_code_sha256: askanydoc_api_/pNJTHSPldTpzIUXJZYsx8ghvdeLeG4rLpqhEGG3y9E=_answer_jobs_2SePvjmKFkerJ4K/2GGKZI/d4td+Nxq5f/uUNF4/SPc=
+deployed_lambda_code_sha256: askanydoc_api_KxiRPRYxr0K2EpYmLvYm4jktSbwPS44TsAncGi2HASA=_answer_jobs_qbElBsCo5kE4tO/nNY+D7Hc0oQBZDGbgolmzsNdHU18=
 next_action: Stop for Bishal review; implicit source inference and deeper follow-up logic are deferred; if no changes are requested, design the separate alerts package with expected-no-match exclusions, cost, ownership, rollback, exact Terraform plan, and fresh approval
-last_automated_verification: 48_API_tests_and_23_SharePoint_tests_passed; production_no_refresh_explicit_AWS_5_citations_SharePoint_3_citations_combined_6_citations_from_both_libraries; all_3_Lambdas_active_successful; post_apply_Terraform_no_changes
+last_automated_verification: 52_API_tests_and_23_SharePoint_tests_passed; final_live_no_match_safe_decline_general_AWS_and_SharePoint_passed; two_combined_questions_returned_7_citations_each_at_12_message_history_limit; post_apply_Terraform_no_changes
 frontend_current_lint_build: passed_with_existing_590_kb_bundle_warning
 terraform_current_validation: validate_passed_with_terraform_1_16_3; fmt_check_flags_ignored_live_auth_tfvars_style_only
 terraform_plan_status: conversation_grounding_plan_sha256_2B0F2918E102FBB98D17057FC6D308CB7DDC166B423B648ACBF88C74B3335B7A_applied_exactly_2_local_trigger_replacements_3_lambda_code_updates; post_apply_plan_no_changes
@@ -246,6 +246,16 @@ Use these words precisely:
 - **Production-ready:** security, reliability, monitoring, cost, recovery, governance, and operational ownership all meet an agreed production standard.
 
 Never substitute one level of evidence for another.
+
+### 3.6 Superseding live hardening evidence - 2026-10-02
+
+Bishal approved the application-only planner/refusal/comparison patch and code-package deployment, then requested an additional two-source test. The planner now has explicit search/decline outcomes; declined plans execute no retrieval and produce no citations. Empty search queries and malformed plans still fail closed. Bedrock completion reasons are checked, with one bounded token-limit retry. Supported comparisons may synthesise separate sources; partial answers retain citations for supported parts and identify missing evidence. A harmless unusual policy query remains a search/no-match, not a fabrication refusal.
+
+Final deployed worker/API-job package SHA-256: `qbElBsCo5kE4tO/nNY+D7Hc0oQBZDGbgolmzsNdHU18=`; legacy answer package: `KxiRPRYxr0K2EpYmLvYm4jktSbwPS44TsAncGi2HASA=`. Final recovery plan SHA-256: `7F8A9EC790F63375E34059BBE3BE5F596DE474C25AD8D135F80B32A04355E89D`. Apply completed with one local build-trigger replacement and three in-place code updates. Final package inspection proves only `assistant_orchestrator.py` differs from verified pre-patch packages; protected retrieval code and pinned dependencies are identical. Post-apply Terraform plan reports no changes.
+
+Final live checks: no-match `c8cc4051-325c-5ca1-b074-236870367eec`; safe decline `d9c01a32-3239-5808-9342-790b70bd9a45`; general knowledge `40c52022-080b-55e9-8e8d-431b4aba57a4`; AWS `8fa8ad10-5d78-5121-85d0-ce291fa1438c`; DR/hybrid comparison `dc3af604-f554-5350-aca0-953db7be0a18`; SQS/hybrid question `80975b31-c1a7-571c-b71c-380882b724ce`; SharePoint-only `2052d127-6ec2-5cbc-b2de-b21e2dff2231`. The two combined questions each returned seven citations across both libraries in one continuous 12-message session. Intermediate retest failures and build recovery remain recorded in the implementation log and modernization register. This section supersedes older current-code hashes and next-action wording; earlier deployment records remain historical.
+
+No permission, provider, database-capacity, AWS ingestion/retrieval, document, IAM, queue, table, or frontend configuration changed. Alerts remain design-only; future unrelated changes still require their own scope and approval. Model routing remains probabilistic and requires broader evaluation; these live checks do not prove production readiness.
 
 ## 4. Shared request architecture
 
