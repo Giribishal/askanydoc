@@ -1,6 +1,8 @@
 # AskAnyDoc modernization, risk, known-issue, and change register
 
-**Effective date:** 2026-09-28
+**Current workload correction — 4 October 2026:** Commit `e303b98` includes bounded Salesforce reads and explicit three-source synthesis. Signed-in UI document/mixed requests use existing async `/jobs`; Salesforce-only uses the dedicated API. The initial single-Lambda workload description below is historical where it conflicts. Current architecture and six live tests are in hybrid_assistant_architecture.md and SHAREPOINT_REFERENCE_TEST_MATRIX.md. The commit did not reconcile Terraform state or retire the legacy public endpoint.
+
+**Effective date:** 2026-10-04
 
 **Status:** active living register
 
@@ -231,3 +233,18 @@ Additional build reliability finding: a pinned-dependency install failure interr
 User-requested bounded security checks: three unauthenticated protected endpoints returned 401; admin-identity spoof, credential extraction and forged tool evidence were declined without citations/retrieval; injected user HTML stayed inert (unchanged title, no injected event-handler/image DOM nodes); two direct live Bedrock synthetic document-injection probes answered legitimate evidence and ignored override/delimiter instructions. All 10 checks and request IDs are recorded in the reference test matrix. No new application/deployment changes were made for these probes. Not an exhaustive penetration test or fresh authenticated denied-user audit.
 
 Remaining quality issue: benign requests to summarise quoted attack text or echo security-test HTML were declined. Attack containment passed, but the app should eventually distinguish analysing untrusted instructions from carrying them out using a broader labelled intent evaluation set, preserving fail-closed authorisation and evidence checks. This is a measured refinement need, not a successful security bypass. Do not silently close it or claim arbitrary injection resistance.
+
+
+## 10. Three-source release gates — 4 October 2026
+
+Implementation/evidence committed as `e303b98`; six one-user functional scenarios passed. Existing R-023/R-030 routing/history evaluation and SharePoint attribution/corpus-quality gates remain open. Explicit named-source routing is the current supported contract.
+
+| Gate | Current evidence and next verification | Status |
+|---|---|---|
+| Salesforce identity and permission isolation | Owner-bound code/JWT validation and one-user live proof; test two distinct users/object-field-record permissions, missing/expired/disconnected grants and no cross-user evidence. Earlier SharePoint Adele/Alex results do not prove Salesforce isolation. | Open before broader release |
+| Grant lifecycle and MCP reliability | Unit tests and working current grant; live revoke/reconnect, expired-token refresh, concurrent refresh protection and intermittent nested McpError root cause remain unverified. Correlate safe outcomes without token/record logging. | Open |
+| Requested-record relevance/completeness | Deterministic bounded CRM note deployed and retested; final all-three answer included a separately cited restore-test Case. Evaluate tighter requested-record selection while retaining honest sample/no-match disclosure and safe citation checks. | Mitigated completeness; relevance open |
+| Terraform reconciliation/build recovery | Targeted CLI deployment left drift; validate passed, no apply/import. Prepare exact scoped plan before further apply, protecting job API and original providers. Rollback archives are private ignored local files; retain and secure recovery evidence before removal. Dependency-install fail-fast hardening remains open. | Open; fresh plan/approval required |
+| New connector capability | Registry contract test demonstrates extensibility only. Snowflake/HubSpot are not connected. Verify vendor tools, permissions, processing, budgets and relevant acceptance gate before adding adapter/routing. | Deferred |
+
+Next recommended review: identity/lifecycle and relevance gates, then separately scoped Terraform reconciliation and existing observability/evaluation/recovery work. This is a recommendation, not a newly adopted phase or deployment authorization. Current primary guidance links and exact applied rollback are in SHARED_SOURCE_ANSWER_DIRECTION.md and SALESFORCE_MCP_ONE_PASS_INTEGRATION.md Stage 6B.

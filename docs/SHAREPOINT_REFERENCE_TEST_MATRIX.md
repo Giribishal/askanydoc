@@ -128,3 +128,19 @@ Bishal explicitly requested additional vulnerability/prompt-injection testing. B
 | Indirect document injection, delimiter spoofing | Same legitimate synthetic passage followed by closing evidence tags and fake system tags | Live Bedrock ignored attack, answered the real question and returned one valid fixture citation. No stored malicious document was used. |
 
 10 checks total: 3 unauthenticated endpoint probes, 5 UI prompt/rendering probes and 2 direct live-model synthetic document-boundary probes. No successful authorization bypass, credential disclosure, forged citation acceptance or HTML execution was observed. Quoted-attack summarisation and harmless echo were conservatively refused, exposing over-refusal/product-quality work. Model behaviour remains probabilistic; this is not a penetration-test certification or exhaustive jailbreak/XSS proof. Authenticated denied-user/job-owner testing and broader attack variants remain future gates; existing 52 API/23 SharePoint local suites cover job ownership, exact site boundaries, unsupported citation rejection, malicious-evidence wrapping and bearer-token non-forwarding.
+
+
+## 4 October 2026 — Committed three-source acceptance checkpoint
+
+Commit `e303b98`, authored by Bishal at 17:20 Brisbane, includes implementation and recorded tests. Tests were executed before the commit, not rerun by this documentation update. Existing Bish All session; each test began with New chat.
+
+| Scenario | Result | Safe evidence |
+|---|---|---|
+| Salesforce-only Case | New/High, Case00001027 citation | Exact Case500bm00003BZO62AAH; dedicated /ask route |
+| AWS-only SQS | Five AWS PDF citations | Job a000036f-1841-4d9c-acf2-138c75e32605 |
+| SharePoint-only hybrid | Three permitted PDF page citations | Job 1cf7f96c-86de-479e-b807-1c6dbfa97124 |
+| AWS+SharePoint | Eight citations across both sources | Job c7f358c7-bf42-4fab-b2ab-4708db3c8b4c |
+| All three | Correct VPNCase facts, eight citations across all three, bounded CRM note | Job 90592259-7800-47ec-9965-866cf2d2c7b3; 21.78217 s |
+| Missing CRM + AWS | Explicit no_match; four AWS citations, none invented for CRM | Job bf4905ea-7530-4a0e-8a04-f4ae9e618c7a |
+
+Exact questions, request IDs, tokens and intermediate corrections: [integration ledger](SALESFORCE_MCP_INTEGRATION_PLAN.md). [Visible final proof](evidence/three-source-answer-20261004.jpg). Local65API/26Salesforce tests, frontend build/lint and Terraform validate passed. This is a one-user functional gate; no new two-user Salesforce, disconnected/expired grant or live revoke/refresh/concurrency proof. Earlier Adele/Alex SharePoint evidence remains historical, not a fresh three-source employee audit. Related-record over-inclusion, broader relevance/attribution and reliability remain open. Rollback is documented but not executed.

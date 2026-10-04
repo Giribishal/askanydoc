@@ -2,12 +2,20 @@
 
 **Project 1 of 3 · Weeks 1–6 · Hybrid AI and RAG assistant on AWS**
 
-## Status: 🔄 In progress — permission-aware AWS + SharePoint answers work end to end; operational hardening remains
+## Status: 🔄 In progress — AWS + SharePoint + Salesforce answers tested; operational hardening remains
 
 - Started: 2026-06-13
 - Shipped v1.0: (TBD)
 - Live app: use the current Terraform `cloudfront_url` output. The former S3 website URL is historical; the website bucket is now private behind CloudFront.
 - GitHub repo: https://github.com/Giribishal/askanydoc
+
+### Current committed capability — 4 October 2026
+
+Commit `e303b98` adds bounded CRM reads and explicit combined questions across AWS, SharePoint and Salesforce. Salesforce-only questions use `/salesforce/ask`; mixed Salesforce/document questions use existing async `/jobs` and `shared_source_controller.py`; ordinary document questions retain the existing controller. Salesforce access stays user-bound in its dedicated Lambda, while SharePoint uses delegated Graph Search plus bounded extraction (Option B). No source stores, source permissions or IAM were merged. Future connectors require verified thin adapters and acceptance tests; they are not connected by this commit.
+
+Six live scenarios passed: Salesforce-only, AWS-only, SharePoint-only, AWS+SharePoint, all three, and missing CRM with AWS. Local 65 API and 26 Salesforce tests, frontend build/lint and Terraform validate passed. Final all-three job `90592259-7800-47ec-9965-866cf2d2c7b3` returned eight selected citations across three groups and bounded CRM coverage. These tests do not establish production readiness.
+
+Use the existing [ordered integration guide, Stage 6B](docs/SALESFORCE_MCP_ONE_PASS_INTEGRATION.md#stage-6b--add-shared-aws-sharepoint-and-salesforce-answers), [action/test ledger](docs/SALESFORCE_MCP_INTEGRATION_PLAN.md), [architecture](docs/hybrid_assistant_architecture.md) and [risk register](docs/MODERNIZATION_RISK_AND_CHANGE_REGISTER.md). Actual deployed packages were backed up before targeted updates; rollback preserves existing grants and retrieval paths. Terraform reconciliation, two-user Salesforce isolation, refresh/revoke/concurrency and measured relevance/attribution follow-ups remain open. Remote push has not been verified.
 
 ### Verified progress
 
@@ -45,7 +53,7 @@
 - ✅ Cost-per-call measured from a fresh request
 - ✅ Sunday post #2 published
 
-Prompt-tutorial and assigned-reading status remain personal learning-log follow-ups; they do not block beginning Week 3. The uncommitted authored work and generated dependency churn still need a deliberate Git-hygiene pass.
+Prompt-tutorial and assigned-reading status remain personal learning-log follow-ups; they do not block beginning Week 3. That historical Git-hygiene note is superseded by the verified clean post-commit checkpoint for `e303b98`; the present follow-up is documentation only.
 
 ### Current verified hybrid boundary
 

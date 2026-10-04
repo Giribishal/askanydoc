@@ -20,7 +20,7 @@ AskAnyDoc keeps the two retrieval paths deliberately separate so they can be lea
 
 ## Neutral application bridge
 
-`app/api/organisation_tools.py` and `app/api/assistant_orchestrator.py` are the only source-neutral bridge. They expose separate tools (`search_aws_documents` and, only for an authenticated and enabled request, `search_sharepoint`) and normalize evidence/citations without merging the underlying stores or authentication models.
+`app/api/organisation_tools.py` and `app/api/assistant_orchestrator.py` provide the existing document bridge. `app/api/shared_source_controller.py` adds the bounded mixed-source registry, reusing those helpers and the dedicated `/salesforce/evidence` adapter. Salesforce tokens remain inside its dedicated Lambda. Commit `e303b98` preserves the underlying stores and permission models. They expose separate tools (`search_aws_documents` and, only for an authenticated and enabled request, `search_sharepoint`) and normalize evidence/citations without merging the underlying stores or authentication models.
 
 This boundary makes it possible to compare authorization, retrieval, failure handling, cost, and operational evidence for AWS and Microsoft independently.
 

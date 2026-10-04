@@ -213,3 +213,14 @@ Option A, Microsoft 365 Copilot Retrieval, was the preferred target. Option B re
 - The design reduces deployment and dependency blast radius and allows measured concurrency isolation. It adds a small invocation charge and overlapping billed duration for synchronous calls.
 - Complete the current permission/latency baseline before migration. Any new Lambda, IAM, invocation permission, routing change, or deployment requires a fresh exact Terraform plan and explicit approval.
 - `SHAREPOINT_LAMBDA_SEPARATION_PLAN.md` retains only the target shape and non-negotiable rules. The single current list of triggers, risks, gates, cost, rollback, acceptance evidence, and implementation order is `MODERNIZATION_RISK_AND_CHANGE_REGISTER.md` (`R-003`, `R-007`, `R-013`, and `R-021`).
+
+
+## ADR-010 — 2026-10-04 — Bounded shared answers through thin source adapters
+
+**Status:** approved, deployed and functionally tested; committed by Bishal as `e303b98`.
+
+**Before:** Documents used the AWS/SharePoint controller; Salesforce answers used a separate route. **Decision:** Add a small request-scoped source registry for explicitly mixed Salesforce/document questions through existing async jobs. Reuse AWS/SharePoint retrieval, existing evidence/citation finalization and delegated source permissions. The dedicated Salesforce Lambda exposes evidence only after the existing Entra JWT authorizer and resolves the current user grant locally. Keep Salesforce-only and document-only behavior. No framework, service, dependency, index or permission expansion.
+
+**Evidence:** First-party guidance was checked on 4 October in SHARED_SOURCE_ANSWER_DIRECTION.md; installed interfaces and final code verified. Six visible scenarios and local 65 API/26Salesforce tests plus frontend build/lint and Terraform validate passed; exact hashes and intermediate correction in SALESFORCE_MCP_INTEGRATION_PLAN.md.
+
+**Consequences:** One final answer can cite all three stores; failures/no-match and CRM sample limits are disclosed. Explicit source routing, bounded data and no implicit entity join are deliberate limits. Future connectors require verified capabilities and adapter/permission tests. Live cross-user/refresh/concurrency reliability and Terraform drift remain open. Immediate exact-impact approval was obtained and consumed; no further deployment authorized. **Rollback:** Existing one-pass guide Stage 6B restores saved actual ZIPs/environment/frontend and removes only the added route, preserving grants and prior paths. This extends ADR-001/005, preserves ADR-008/009 and supersedes the pre-activation direction, not the underlying retrieval providers.

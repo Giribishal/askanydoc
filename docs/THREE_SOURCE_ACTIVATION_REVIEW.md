@@ -1,9 +1,11 @@
 # Three-source activation review — 4 October 2026
 
-**Current checkpoint, 4 October 2026:** Bishal approved the exact protected-path impact. Three-source AWS + SharePoint + Salesforce synthesis is now deployed and visibly tested, including all three citation groups and bounded CRM coverage. AWS-only, SharePoint-only, AWS+SharePoint and Salesforce-only regressions passed; a mixed missing-CRM test disclosed no_match and cited only found AWS evidence. Existing grants, IAM, data and original retrieval implementations were preserved. The sections describing pending activation below are historical. Exact actions, hashes, safe request IDs, tests and rollback are in [the integration ledger](SALESFORCE_MCP_INTEGRATION_PLAN.md) and [existing one-pass guide, Stage 6B](SALESFORCE_MCP_ONE_PASS_INTEGRATION.md#stage-6b--add-shared-aws-sharepoint-and-salesforce-answers). Source remains uncommitted; Terraform reconciliation, two-user permissions, refresh/revoke and reliability gates remain open.
+**Verified commit checkpoint — 4 October 2026, 17:20 Brisbane:** Bishal committed the implementation, tests and existing deployment/rollback evidence as `e303b98a02fafaf10cef0b0fa1848b70eea098d1` (`Add shared answers across AWS, SharePoint and Salesforce`). The repository was clean when inspected after the commit. This follow-up changes documentation only and remains uncommitted for Bishal. Previously deployed packages were not redeployed by Git commit; live three-source evidence remains the recorded 4 October tests. Remote push status has not been checked. Terraform drift, two-user Salesforce permissions, grant refresh/revoke/concurrency, MCP reliability and broader answer-quality gates remain open.
+
+**Current checkpoint, 4 October 2026:** Bishal approved the exact protected-path impact. Three-source AWS + SharePoint + Salesforce synthesis is now deployed and visibly tested, including all three citation groups and bounded CRM coverage. AWS-only, SharePoint-only, AWS+SharePoint and Salesforce-only regressions passed; a mixed missing-CRM test disclosed no_match and cited only found AWS evidence. Existing grants, IAM, data and original retrieval implementations were preserved. The sections describing pending activation below are historical. Exact actions, hashes, safe request IDs, tests and rollback are in [the integration ledger](SALESFORCE_MCP_INTEGRATION_PLAN.md) and [existing one-pass guide, Stage 6B](SALESFORCE_MCP_ONE_PASS_INTEGRATION.md#stage-6b--add-shared-aws-sharepoint-and-salesforce-answers). Implementation and recorded evidence are committed as `e303b98`; Terraform reconciliation, two-user permissions, refresh/revoke and reliability gates remain open.
 
 
-## Ready locally; not activated or live-proven
+## Historical pre-approval review — subsequently activated and verified
 
 New `app/api/shared_source_controller.py` implements a small adapter registry, focused per-source query planning, bounded retrieval, shared evidence/citation synthesis and deterministic partial-coverage disclosure. The controller accepts explicitly requested registered sources, including a test adapter representing a future connector. Today's transport opt-in is explicit Salesforce plus existing AWS/SharePoint source cues; automatic inference for all future systems is not claimed.
 
@@ -11,7 +13,7 @@ New `app/salesforce/evidence_endpoint.py` retrieves evidence using the validated
 
 The six-existing-file activation diff is `SHARED_SOURCE_ACTIVATION.patch`. Its candidate files are under ignored `tmp/three-source-activation/`. The protected worker, existing frontend and Terraform files have not received this patch. New local modules are uncommitted. The existing Salesforce/frontend changes from the earlier deployed slice also remain uncommitted; this activation must not overwrite them.
 
-## Exact proposed impact
+## Reviewed impact subsequently applied
 
 - `app/api/answer_job_worker.py`: dispatch only mixed Salesforce/document questions to the new controller. Ordinary document jobs still call the current `answer_question`. Database resume exceptions still reach the existing bounded retry logic; queue/result/lease handling is unchanged.
 - `app/salesforce/web_handler.py`: dispatch new `POST /salesforce/evidence` to the evidence-only helper. Existing connection, disconnect, refresh and `/ask` routes remain.

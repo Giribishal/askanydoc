@@ -16,7 +16,25 @@ For every response, the API identifies the source mode:
 | `organisation_sources` | The answer relies on retrieved organisation evidence and must cite it |
 | `organisation_not_found` | The user requested organisation information but sufficient evidence was unavailable |
 
-## Current request flow
+## Current request flow — committed as e303b98
+
+```text
+Signed-in browser → existing Entra JWT-protected API
+  Salesforce only → /salesforce/ask → dedicated Salesforce Lambda
+  Documents only  → /jobs → existing document controller
+  Mixed Salesforce + document cues
+    → /jobs → worker → shared_source_controller adapter registry
+       AWS adapter → existing embedding/pgvector retrieval
+       SharePoint adapter → existing delegated Graph search/extraction
+       Salesforce adapter → fixed /salesforce/evidence JWT route
+         → dedicated Lambda → current user grant → Hosted MCP reads
+    → bounded normalized evidence → existing Bedrock finalization
+    → application-validated citations + source coverage disclosure
+```
+
+The shared controller plans focused per-source queries and enforces registered-source, item, byte and response limits. Salesforce credentials never enter the worker. Missing/failed sources produce an honest partial answer; database resume errors still reach the worker retry. CRM reads are a bounded recent sample, not an exhaustive audit. Source selection currently requires explicit Salesforce and document cues; automatic universal connector inference and cross-system entity joins are not implemented. Existing source permissions/stores remain separate. See the integration ledger for exact query, package and latency evidence, and one-pass Stage 6B for rollback.
+
+## Historical initial request flow
 
 ```text
 Browser sends current message + bounded recent history
