@@ -1,7 +1,9 @@
 # AskAnyDoc SharePoint retrieval — current source of truth
 
-**Effective date:** 2026-10-02
-**Document version:** 1.25
+**4 October 2026 shared-source checkpoint:** Explicit mixed Salesforce/document questions now use shared_source_controller.py through the existing worker. Option B graph_search remains selected and all existing AWS/SharePoint retrieval implementation, permissions and data are preserved. Bishal approved the exact protected-path update; approval is consumed. Final worker hash hNjM2dh6IPI78hCGNXlcjSBQsULPCoXbDo0acKCEAZ0= supersedes only the worker hash in the historical 2 October contract below; legacy/job API packages unchanged. Visible SharePoint-only, AWS-only, both documents and all-three checks passed; missing CRM gave honest partial coverage. [Exact deployment/test ledger](SALESFORCE_MCP_INTEGRATION_PLAN.md), [existing ordered guide and rollback](SALESFORCE_MCP_ONE_PASS_INTEGRATION.md#stage-6b--add-shared-aws-sharepoint-and-salesforce-answers). No new provider/index/permissions. Existing attribution, employee-isolation and operational gates remain; Terraform CLI drift not reconciled.
+
+**Effective date:** 2026-10-04
+**Document version:** 1.26
 **Authority:** This document is the authoritative current execution plan for the SharePoint retrieval slice.
 **Historical records:** Older chats, trackers, ADRs, and implementation logs remain valuable history. If their current recommendation conflicts with this document, follow this document and record any future correction append-only.
 

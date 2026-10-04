@@ -19,6 +19,9 @@ from answer_lambda_handler import (
 )
 
 
+from shared_source_controller import run_shared_answer, shared_answer_requested
+
+
 dynamodb_client = aws_client("dynamodb")
 sqs_client = aws_client("sqs")
 
@@ -181,7 +184,9 @@ def _process_record(record: dict[str, Any], context: Any) -> bool:
     question_hash = hashlib.sha256(question.encode("utf-8")).hexdigest()[:12]
     tracing_enabled = configure_langfuse()
     try:
-        payload = answer_question(question, history, auth_context)
+        payload = (run_shared_answer(question, history, auth_context)
+                   if shared_answer_requested(question)
+                   else answer_question(question, history, auth_context))
         _complete_job(job_id, payload, request_id)
         print(json.dumps({
             "event": "answer_job_completed",

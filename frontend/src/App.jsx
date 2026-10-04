@@ -31,7 +31,7 @@ function tokenDiagnostics(accessToken) {
 function citationSourceSystem(citation) {
   const sourceType = citation?.source_type?.toLowerCase()
   const sourceUri = citation?.source_uri?.toLowerCase() || ""
-  if (sourceType === "salesforce_case") return "salesforce"
+  if (sourceType === "salesforce_case" || sourceType === "salesforce_record") return "salesforce"
   if (sourceType === "sharepoint" || sourceUri.includes(".sharepoint.com/")) {
     return "sharepoint"
   }
@@ -46,11 +46,11 @@ function sourceBadgeLabel(message) {
   if (message.source_mode !== "organisation_sources") return null
 
   const sourceSystems = new Set((message.citations || []).map(citationSourceSystem))
-  if (sourceSystems.has("aws") && sourceSystems.has("sharepoint")) {
-    return "Sources: AWS document library + SharePoint"
-  }
+  const sourceLabels = { aws: "AWS document library", sharepoint: "SharePoint", salesforce: "Salesforce" }
+  const labels = Object.keys(sourceLabels).filter(key => sourceSystems.has(key)).map(key => sourceLabels[key])
+  if (labels.length > 1) return `Sources: ${labels.join(" + ")}`
   if (sourceSystems.has("sharepoint")) return "Source: SharePoint"
-  if (sourceSystems.has("salesforce")) return "Source: Salesforce Case"
+  if (sourceSystems.has("salesforce")) return "Source: Salesforce"
   if (sourceSystems.has("aws")) return "Source: AWS document library"
   return "Source: Organisation documents"
 }
@@ -59,7 +59,7 @@ function groupedCitations(citations = []) {
   const groups = {
     aws: { label: "AWS document library", citations: [] },
     sharepoint: { label: "SharePoint", citations: [] },
-    salesforce: { label: "Salesforce Cases", citations: [] },
+    salesforce: { label: "Salesforce records", citations: [] },
     other: { label: "Other organisation sources", citations: [] },
   }
   citations.forEach(citation => groups[citationSourceSystem(citation)].citations.push(citation))
@@ -353,11 +353,12 @@ function App() {
     try {
       const token = await accessToken()
       if (!token) return
-      const isSalesforceCase = /salesforce/i.test(submittedQuestion) && /\b500[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?\b/.test(submittedQuestion)
-      if (isSalesforceCase && !salesforceConnected) {
-        throw new Error("Connect your Salesforce account before asking about a Case.")
+      const isSalesforceQuestion = /\bsalesforce\b/i.test(submittedQuestion)
+      const isSharedQuestion = isSalesforceQuestion && /\b(aws|sharepoint|microsoft 365|amazon s3|lambda|bedrock|aurora|sqs|partial batch|disaster recovery|hybrid cloud)\b/i.test(submittedQuestion)
+      if (isSalesforceQuestion && !isSharedQuestion && !salesforceConnected) {
+        throw new Error("Connect your Salesforce account before asking about CRM records.")
       }
-      if (isSalesforceCase) {
+      if (isSalesforceQuestion && !isSharedQuestion) {
         const answer = await salesforceRequest("/ask", "POST", { question: submittedQuestion, history })
         setMessages(prev => [...prev, {
           role: "ai", text: answer.answer, source_mode: answer.source_mode,

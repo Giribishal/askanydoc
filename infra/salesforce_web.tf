@@ -131,6 +131,8 @@ resource "null_resource" "salesforce_web_package" {
     source = sha256(join("", [for file in [
       "app/salesforce/__init__.py",
       "app/salesforce/read_adapter.py",
+      "app/salesforce/crm_reader.py",
+      "app/salesforce/evidence_endpoint.py",
       "app/salesforce/web_handler.py",
       "app/api/assistant_orchestrator.py",
       "app/api/answer_lambda_handler.py",
@@ -169,15 +171,15 @@ resource "aws_cloudwatch_log_group" "salesforce_web" {
 }
 
 resource "aws_lambda_function" "salesforce_web" {
-  count                          = var.salesforce_web_enabled ? 1 : 0
-  function_name                  = "askanydoc-salesforce-web-dev"
-  role                           = aws_iam_role.salesforce_web_exec[0].arn
-  filename                       = data.archive_file.salesforce_web_zip[0].output_path
-  source_code_hash               = data.archive_file.salesforce_web_zip[0].output_base64sha256
-  handler                        = "salesforce.web_handler.handler"
-  runtime                        = "python3.13"
-  timeout                        = 29
-  memory_size                    = 512
+  count            = var.salesforce_web_enabled ? 1 : 0
+  function_name    = "askanydoc-salesforce-web-dev"
+  role             = aws_iam_role.salesforce_web_exec[0].arn
+  filename         = data.archive_file.salesforce_web_zip[0].output_path
+  source_code_hash = data.archive_file.salesforce_web_zip[0].output_base64sha256
+  handler          = "salesforce.web_handler.handler"
+  runtime          = "python3.13"
+  timeout          = 29
+  memory_size      = 512
 
   depends_on = [aws_cloudwatch_log_group.salesforce_web]
 
@@ -269,4 +271,14 @@ resource "aws_lambda_permission" "api_gateway_salesforce_web" {
 
 output "salesforce_web_callback_url" {
   value = var.salesforce_web_enabled ? "https://${aws_cloudfront_distribution.frontend.domain_name}/" : null
+}
+
+resource "aws_apigatewayv2_route" "salesforce_evidence" {
+  count                = var.salesforce_web_enabled ? 1 : 0
+  api_id               = aws_apigatewayv2_api.protected_chat.id
+  route_key            = "POST /salesforce/evidence"
+  target               = "integrations/${aws_apigatewayv2_integration.salesforce_web[0].id}"
+  authorization_type   = "JWT"
+  authorizer_id        = aws_apigatewayv2_authorizer.entra.id
+  authorization_scopes = [var.entra_api_scope_name]
 }

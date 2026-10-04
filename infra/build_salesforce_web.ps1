@@ -23,4 +23,4 @@ foreach ($package in @('askanydoc_rag', 'sharepoint', 'salesforce')) {
 }
 Copy-Item (Join-Path $projectRoot 'app/shared/askanydoc_rag/*.py') (Join-Path $buildDir 'askanydoc_rag')
 Copy-Item (Join-Path $projectRoot 'app/sharepoint/*.py') (Join-Path $buildDir 'sharepoint')
-Copy-Item (Join-Path $projectRoot 'app/salesforce/__init__.py'), (Join-Path $projectRoot 'app/salesforce/read_adapter.py'), (Join-Path $projectRoot 'app/salesforce/web_handler.py') (Join-Path $buildDir 'salesforce')
+Copy-Item (Join-Path $projectRoot 'app/salesforce/__init__.py'), (Join-Path $projectRoot 'app/salesforce/read_adapter.py'), (Join-Path $projectRoot 'app/salesforce/crm_reader.py'), (Join-Path $projectRoot 'app/salesforce/evidence_endpoint.py'), (Join-Path $projectRoot 'app/salesforce/web_handler.py') (Join-Path $buildDir 'salesforce')

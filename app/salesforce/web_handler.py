@@ -26,6 +26,8 @@ from askanydoc_rag.aws import aws_client
 from answer_lambda_handler import _auth_context, _validated_history
 from assistant_orchestrator import SALESFORCE_CASE_ID_PATTERN, run_assistant
 from salesforce.read_adapter import case_as_answer_evidence, read_case
+from salesforce.crm_reader import answer_crm, retrieve
+from salesforce.evidence_endpoint import crm_evidence
 
 
 SALESFORCE_MCP_URL = "https://api.salesforce.com/platform/mcp/v1/platform/sobject-reads"
@@ -283,13 +285,25 @@ async def _read_case_mcp(case_id: str, access_token: str, org_origin: str) -> di
                 return await read_case(case_id, session.call_tool, org_origin=org_origin)
 
 
+async def _read_crm_mcp(plan: dict[str, Any], access_token: str, org_origin: str):
+    async with httpx.AsyncClient(headers={"Authorization": f"Bearer {access_token}"}, timeout=httpx.Timeout(20)) as client:
+        async with streamable_http_client(SALESFORCE_MCP_URL, http_client=client) as (read, write, _id):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                listing = await session.list_tools()
+                soql = next((tool for tool in listing.tools if tool.name == "soqlQuery"), None)
+                if soql is None or soql.inputSchema.get("required") != ["q"]:
+                    raise ValueError("The Salesforce SOQL tool schema changed.")
+                return await retrieve(plan, session.call_tool, org_origin)
+
+
 def _ask(auth: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
     question = body.get("question")
     if not isinstance(question, str) or not question.strip() or len(question) > 4000:
         return _response(400, {"error": "Question must be 1 to 4,000 characters."})
     match = SALESFORCE_CASE_ID_PATTERN.search(question)
-    if "salesforce" not in question.casefold() or match is None:
-        return _response(400, {"error": "Ask about one Salesforce Case by its record ID."})
+    if "salesforce" not in question.casefold():
+        return _response(400, {"error": "Specify Salesforce as the source for this CRM question."})
     try:
         history = _validated_history(body.get("history"))
     except ValueError as error:
@@ -297,8 +311,13 @@ def _ask(auth: dict[str, str], body: dict[str, Any]) -> dict[str, Any]:
     owner = _owner_hash(auth)
     grant = _load_grant(owner)
     if grant is None:
-        return _response(409, {"error": "Connect your Salesforce account before asking about Cases."})
+        return _response(409, {"error": "Connect your Salesforce account before asking about CRM records."})
     grant = _refresh_grant(owner, grant)
+    if match is None:
+        return _response(200, answer_crm(
+            question.strip(), history,
+            reader=lambda plan: asyncio.run(_read_crm_mcp(plan, grant["access_token"], grant["instance_url"])),
+        ))
     case = asyncio.run(_read_case_mcp(match.group(0), grant["access_token"], grant["instance_url"]))
     evidence = case_as_answer_evidence(case) if case is not None else None
     answer = run_assistant(
@@ -330,18 +349,42 @@ def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
             return _disconnect(auth)
         if route == "POST /salesforce/complete":
             return _complete(auth, body)
+        if route == "POST /salesforce/evidence":
+            status, payload = crm_evidence(auth, body, load_grant=_load_grant,
+                refresh_grant=_refresh_grant, owner_hash=_owner_hash, read_crm=_read_crm_mcp)
+            return _response(status, payload)
         if route == "POST /salesforce/ask":
             return _ask(auth, body)
         return _response(404, {"error": "Route not found."})
     except (json.JSONDecodeError, TypeError):
         return _response(400, {"error": "Request body must be valid JSON."})
     except Exception as error:
-        causes = [type(item).__name__ for item in error.exceptions] if isinstance(error, ExceptionGroup) else []
+        def leaf_types(item):
+            if isinstance(item, BaseExceptionGroup):
+                return [kind for child in item.exceptions for kind in leaf_types(child)]
+            return [type(item).__name__]
+        causes = leaf_types(error)
+        def protocol_details(item):
+            if isinstance(item, BaseExceptionGroup):
+                return [detail for child in item.exceptions for detail in protocol_details(child)]
+            data = getattr(item, "error", None)
+            if type(item).__name__ != "McpError" or data is None:
+                return []
+            message = str(getattr(data, "message", "")).casefold()
+            categories = [label for label, words in {
+                "session": ("session", "initializ"), "authorization": ("token", "auth", "permission"),
+                "rate_limit": ("rate", "quota", "limit"), "input": ("argument", "parameter", "invalid"),
+                "timeout": ("timeout", "timed out"), "tool": ("tool", "query"),
+            }.items() if any(word in message for word in words)]
+            code = getattr(data, "code", None)
+            return [{"code": code if isinstance(code, int) else None, "categories": categories}]
+        protocol = protocol_details(error)
         print(json.dumps({
             "event": "salesforce_web_request_failed",
             "route": route,
             "error_type": type(error).__name__,
             "cause_types": causes,
+            "mcp_errors": protocol,
             "aws_error_code": error.response.get("Error", {}).get("Code") if isinstance(error, ClientError) else None,
             "request_id": getattr(context, "aws_request_id", None),
         }))

@@ -226,6 +226,7 @@ resource "null_resource" "install_answer_jobs_deps" {
       for file in [
         "answer_job_api_handler.py",
         "answer_job_worker.py",
+        "shared_source_controller.py",
         "answer_lambda_handler.py",
         "assistant_orchestrator.py",
         "organisation_tools.py",
@@ -244,7 +245,7 @@ resource "null_resource" "install_answer_jobs_deps" {
   }
 
   provisioner "local-exec" {
-    command     = "if (Test-Path ${path.module}\\answer_jobs_build) { Remove-Item -Recurse -Force ${path.module}\\answer_jobs_build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/answer_jobs_build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_job_api_handler.py,${path.module}\\..\\app\\api\\answer_job_worker.py,${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\assistant_orchestrator.py,${path.module}\\..\\app\\api\\organisation_tools.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\answer_jobs_build; New-Item -ItemType Directory -Force ${path.module}\\answer_jobs_build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\answer_jobs_build\\askanydoc_rag; New-Item -ItemType Directory -Force ${path.module}\\answer_jobs_build\\sharepoint | Out-Null; Copy-Item ${path.module}\\..\\app\\sharepoint\\*.py ${path.module}\\answer_jobs_build\\sharepoint"
+    command     = "if (Test-Path ${path.module}\\answer_jobs_build) { Remove-Item -Recurse -Force ${path.module}\\answer_jobs_build }; pip install -r ${path.module}/../app/api/requirements.txt -t ${path.module}/answer_jobs_build --platform manylinux2014_x86_64 --python-version 3.13 --implementation cp --abi cp313 --only-binary=:all: --upgrade; Copy-Item ${path.module}\\..\\app\\api\\answer_job_api_handler.py,${path.module}\\..\\app\\api\\answer_job_worker.py,${path.module}\\..\\app\\api\\shared_source_controller.py,${path.module}\\..\\app\\api\\answer_lambda_handler.py,${path.module}\\..\\app\\api\\assistant_orchestrator.py,${path.module}\\..\\app\\api\\organisation_tools.py,${path.module}\\..\\app\\api\\retrieval.py ${path.module}\\answer_jobs_build; New-Item -ItemType Directory -Force ${path.module}\\answer_jobs_build\\askanydoc_rag | Out-Null; Copy-Item ${path.module}\\..\\app\\shared\\askanydoc_rag\\*.py ${path.module}\\answer_jobs_build\\askanydoc_rag; New-Item -ItemType Directory -Force ${path.module}\\answer_jobs_build\\sharepoint | Out-Null; Copy-Item ${path.module}\\..\\app\\sharepoint\\*.py ${path.module}\\answer_jobs_build\\sharepoint"
     interpreter = ["PowerShell", "-Command"]
   }
 }
@@ -303,6 +304,7 @@ resource "aws_lambda_function" "answer_job_worker" {
       ANSWER_JOBS_TABLE_NAME              = aws_dynamodb_table.answer_jobs.name
       ANSWER_JOBS_QUEUE_URL               = aws_sqs_queue.answer_jobs.url
       ANSWER_JOB_LEASE_SECONDS            = "240"
+      SALESFORCE_EVIDENCE_URL             = var.salesforce_web_enabled ? "${aws_apigatewayv2_api.protected_chat.api_endpoint}/salesforce/evidence" : ""
       ANSWER_MODEL_ID                     = "au.anthropic.claude-haiku-4-5-20251001-v1:0"
       DATABASE_RESUME_MAX_WAIT_SECONDS    = "15"
       DATABASE_RESUME_MAX_JOB_ATTEMPTS    = "3"

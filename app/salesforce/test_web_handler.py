@@ -55,6 +55,27 @@ class SalesforceWebBoundaryTests(unittest.TestCase):
         self.assertEqual(params["code_challenge_method"], ["S256"])
         self.assertEqual(params["scope"], ["mcp_api refresh_token"])
 
+    def test_natural_crm_question_uses_current_users_grant(self):
+        grant = {"access_token": "current-user-token", "instance_url": "https://demo.my.salesforce.com"}
+        def answer(question, history, reader):
+            evidence, truncated = reader({"reads": []})
+            return {"answer": "CRM", "citations": evidence}
+        with patch.object(web, "_load_grant", return_value=grant) as load, \
+                patch.object(web, "_refresh_grant", return_value=grant), \
+                patch.object(web, "_read_crm_mcp", return_value=([], False)) as read, \
+                patch.object(web, "answer_crm", side_effect=answer):
+            response = web._ask(self.auth, {"question": "Find Salesforce VPN cases."})
+        self.assertEqual(response["statusCode"], 200)
+        load.assert_called_once_with(web._owner_hash(self.auth))
+        self.assertEqual(read.call_args.args[1], "current-user-token")
+        self.assertNotIn("current-user-token", response["body"])
+
+    def test_disconnected_user_cannot_read_crm(self):
+        with patch.object(web, "_load_grant", return_value=None), patch.object(web, "answer_crm") as answer:
+            response = web._ask(self.auth, {"question": "Find Salesforce VPN cases."})
+        self.assertEqual(response["statusCode"], 409)
+        answer.assert_not_called()
+
     def test_disconnect_revokes_only_current_users_refresh_grant(self):
         grant = {"refresh_token": "secret-refresh", "instance_url": "https://demo.my.salesforce.com"}
         class Response:

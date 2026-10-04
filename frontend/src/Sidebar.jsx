@@ -140,7 +140,7 @@ function Sidebar({
             <div className="connection-details">
               <p><strong>Status</strong> {salesforceConnected ? "Connected" : "Not connected"}</p>
               {salesforceOrg && <p><strong>Org</strong> {salesforceOrg}</p>}
-              <p><strong>Access</strong> Cases · Read only</p>
+              <p><strong>Access</strong> CRM records · Read only</p>
               <p>Your Salesforce account is authorized separately from Microsoft sign-in.</p>
               {salesforceConnected && !pendingConnectionAction && <div className="connection-actions">
                 <button type="button" disabled={salesforceBusy} onClick={() => setPendingConnectionAction('switch')}>Change account</button>
